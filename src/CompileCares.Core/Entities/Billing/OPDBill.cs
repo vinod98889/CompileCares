@@ -55,7 +55,8 @@ namespace CompileCares.Core.Entities.Billing
         public virtual OPDVisit? OPDVisit { get; private set; }
         public virtual Patient? Patient { get; private set; }
         public virtual Doctor? Doctor { get; private set; }
-        public virtual ICollection<OPDBillItem> BillItems { get; private set; } = new List<OPDBillItem>();
+        private readonly List<OPDBillItem> _billItems = new();
+        public IReadOnlyCollection<OPDBillItem> BillItems => _billItems.AsReadOnly();
 
         // Private constructor for EF Core
         private OPDBill() { }
@@ -66,6 +67,7 @@ namespace CompileCares.Core.Entities.Billing
             Guid patientId,
             Guid doctorId,
             decimal consultationFee,
+            Guid consultationItemMasterId, // REQUIRED: Which OPDItemMaster to use for consultation
             Guid? createdBy = null)
         {
             ValidateInput(opdVisitId, patientId, doctorId, consultationFee);
@@ -83,8 +85,8 @@ namespace CompileCares.Core.Entities.Billing
             DiscountPercentage = 0;
             TaxPercentage = 5.0m; // Default 5% GST
 
-            // Add consultation as first bill item
-            AddConsultationCharge("Consultation", consultationFee);
+            // Add consultation as a bill item using the provided OPDItemMasterId
+            AddConsultationCharge(consultationItemMasterId, consultationFee, createdBy);
 
             CalculateTotals();
 
@@ -100,16 +102,16 @@ namespace CompileCares.Core.Entities.Billing
             decimal consultationFee)
         {
             if (opdVisitId == Guid.Empty)
-                throw new ArgumentException("OPD Visit ID is required");
+                throw new ArgumentException("OPD Visit ID is required", nameof(opdVisitId));
 
             if (patientId == Guid.Empty)
-                throw new ArgumentException("Patient ID is required");
+                throw new ArgumentException("Patient ID is required", nameof(patientId));
 
             if (doctorId == Guid.Empty)
-                throw new ArgumentException("Doctor ID is required");
+                throw new ArgumentException("Doctor ID is required", nameof(doctorId));
 
             if (consultationFee < 0)
-                throw new ArgumentException("Consultation fee cannot be negative");
+                throw new ArgumentException("Consultation fee cannot be negative", nameof(consultationFee));
         }
 
         // Generate bill number
@@ -120,13 +122,19 @@ namespace CompileCares.Core.Entities.Billing
 
         // ========== DOMAIN METHODS ==========
 
-        // Add bill item from OPDItemMaster
+        /// <summary>
+        /// Adds a bill item using an OPDItemMaster
+        /// </summary>
         public void AddBillItem(
             OPDItemMaster itemMaster,
             int quantity = 1,
             decimal? customPrice = null,
+            decimal? discountPercentage = null,
             Guid? updatedBy = null)
         {
+            if (itemMaster == null)
+                throw new ArgumentNullException(nameof(itemMaster));
+
             if (!itemMaster.IsActive)
                 throw new InvalidOperationException($"Item {itemMaster.ItemName} is not active");
 
@@ -136,21 +144,31 @@ namespace CompileCares.Core.Entities.Billing
 
             var unitPrice = customPrice ?? itemMaster.StandardPrice;
 
-            // Create bill item using the OPDItemMaster
-            var billItem = OPDBillItem.CreateFromItemMaster(
-                Id,
-                itemMaster,
-                quantity,
-                unitPrice);
+            // Create bill item using your existing constructor
+            var billItem = new OPDBillItem(
+                opdBillId: Id,
+                opdItemMasterId: itemMaster.Id,
+                itemName: itemMaster.ItemName,
+                itemType: itemMaster.ItemType ?? itemMaster.Category,
+                unitPrice: unitPrice,
+                quantity: quantity,
+                isTaxable: itemMaster.IsTaxable);
 
-            // Apply default commission from master
+            // Apply discount if provided
+            if (discountPercentage.HasValue && discountPercentage.Value > 0)
+            {
+                billItem.ApplyDiscount(discountPercentage.Value, updatedBy);
+            }
+
+            // Apply doctor commission from master
             if (itemMaster.DoctorCommission.HasValue)
             {
                 billItem.SetDoctorCommission(
-                    itemMaster.CalculateCommission(billItem.GetNetAmount()));
+                    itemMaster.DoctorCommission.Value,
+                    updatedBy);
             }
 
-            BillItems.Add(billItem);
+            _billItems.Add(billItem);
 
             // Consume stock if item is consumable
             if (itemMaster.IsConsumable)
@@ -159,7 +177,7 @@ namespace CompileCares.Core.Entities.Billing
             }
 
             // Update category totals
-            UpdateCategoryTotals(itemMaster.ItemType, billItem.GetTotalWithTax());
+            UpdateCategoryTotals(itemMaster.Category, billItem.GetTotalWithTax());
 
             CalculateTotals();
 
@@ -167,92 +185,154 @@ namespace CompileCares.Core.Entities.Billing
                 SetUpdatedBy(updatedBy.Value);
         }
 
-        // Add consultation charge (special method since it's not from OPDItemMaster)
-        public void AddConsultationCharge(string description, decimal amount, Guid? updatedBy = null)
+        public void AddBillItem(
+    OPDItemMaster itemMaster,
+    int quantity,
+    decimal? customPrice,
+    Guid updatedBy)
         {
-            var billItem = new OPDBillItem(
-                Id,
-                Guid.Empty, // No OPDItemMaster for consultation
-                description,
-                "Consultation",
-                amount,
-                1,
-                true);
+            // Call the main method with null discount
+            AddBillItem(
+                itemMaster: itemMaster,
+                quantity: quantity,
+                customPrice: customPrice,
+                discountPercentage: null,
+                updatedBy: updatedBy);
+        }
 
-            BillItems.Add(billItem);
-            UpdateCategoryTotals("consultation", amount);
+        /// <summary>
+        /// Adds a bill item using OPDItemMaster ID (when you don't have the object)
+        /// </summary>
+        public void AddBillItem(
+            Guid opdItemMasterId,
+            string itemName,
+            string itemType,
+            decimal unitPrice,
+            int quantity = 1,
+            decimal discountPercentage = 0,
+            bool isTaxable = true,
+            Guid? updatedBy = null)
+        {
+            if (opdItemMasterId == Guid.Empty)
+                throw new ArgumentException("OPDItemMaster ID is required", nameof(opdItemMasterId));
+
+            if (string.IsNullOrWhiteSpace(itemName))
+                throw new ArgumentException("Item name is required", nameof(itemName));
+
+            if (string.IsNullOrWhiteSpace(itemType))
+                throw new ArgumentException("Item type is required", nameof(itemType));
+
+            if (unitPrice < 0)
+                throw new ArgumentException("Unit price cannot be negative", nameof(unitPrice));
+
+            if (quantity <= 0)
+                throw new ArgumentException("Quantity must be positive", nameof(quantity));
+
+            // Create bill item using your existing constructor
+            var billItem = new OPDBillItem(
+                opdBillId: Id,
+                opdItemMasterId: opdItemMasterId,
+                itemName: itemName,
+                itemType: itemType,
+                unitPrice: unitPrice,
+                quantity: quantity,
+                isTaxable: isTaxable);
+
+            // Apply discount if provided
+            if (discountPercentage > 0)
+            {
+                billItem.ApplyDiscount(discountPercentage, updatedBy);
+            }
+
+            _billItems.Add(billItem);
+
+            // Update category totals (use itemType for category)
+            UpdateCategoryTotals(itemType, billItem.GetTotalWithTax());
+
             CalculateTotals();
 
             if (updatedBy.HasValue)
                 SetUpdatedBy(updatedBy.Value);
         }
 
-        // Add custom bill item (when no OPDItemMaster exists)
+        /// <summary>
+        /// Adds a consultation charge using OPDItemMaster ID
+        /// </summary>
+        public void AddConsultationCharge(
+            Guid consultationItemMasterId,
+            decimal consultationFee,
+            Guid? updatedBy = null)
+        {
+            AddBillItem(
+                opdItemMasterId: consultationItemMasterId,
+                itemName: "Consultation Fee",
+                itemType: "Consultation",
+                unitPrice: consultationFee,
+                quantity: 1,
+                discountPercentage: 0,
+                isTaxable: true,
+                updatedBy: updatedBy);
+        }
+
+        /// <summary>
+        /// Adds a custom bill item (when no OPDItemMaster exists)
+        /// </summary>
         public void AddCustomBillItem(
             string itemName,
             string itemType,
             decimal unitPrice,
             int quantity = 1,
+            decimal discountPercentage = 0,
             bool isTaxable = true,
             Guid? updatedBy = null)
         {
-            var billItem = new OPDBillItem(
-                Id,
-                Guid.Empty, // No OPDItemMaster ID
-                itemName,
-                itemType,
-                unitPrice,
-                quantity,
-                isTaxable);
-
-            BillItems.Add(billItem);
-            UpdateCategoryTotals(itemType.ToLower(), billItem.GetTotalWithTax());
-            CalculateTotals();
-
-            if (updatedBy.HasValue)
-                SetUpdatedBy(updatedBy.Value);
+            AddBillItem(
+                opdItemMasterId: Guid.Empty, // Guid.Empty indicates custom item
+                itemName: itemName,
+                itemType: itemType,
+                unitPrice: unitPrice,
+                quantity: quantity,
+                discountPercentage: discountPercentage,
+                isTaxable: isTaxable,
+                updatedBy: updatedBy);
         }
 
         // Helper method to update category totals
         private void UpdateCategoryTotals(string itemType, decimal amount)
         {
-            switch (itemType.ToLower())
-            {
-                case "consultation":
-                    ConsultationFee += amount;
-                    break;
-                case "procedure":
-                    ProcedureFee += amount;
-                    break;
-                case "medicine":
-                    MedicineFee += amount;
-                    break;
-                case "labtest":
-                    LabTestFee += amount;
-                    break;
-                default:
-                    OtherCharges += amount;
-                    break;
-            }
+            var normalizedType = itemType.ToLower();
+
+            if (normalizedType.Contains("consult"))
+                ConsultationFee += amount;
+            else if (normalizedType.Contains("procedure") || normalizedType.Contains("dressing") || normalizedType.Contains("injection"))
+                ProcedureFee += amount;
+            else if (normalizedType.Contains("medicine") || normalizedType.Contains("drug"))
+                MedicineFee += amount;
+            else if (normalizedType.Contains("lab") || normalizedType.Contains("test") || normalizedType.Contains("xray") || normalizedType.Contains("scan"))
+                LabTestFee += amount;
+            else
+                OtherCharges += amount;
         }
 
         // Calculate all totals
         private void CalculateTotals()
         {
-            // Each item calculates: TotalWithTax = (UnitPrice × Quantity - ItemDiscount) × (1 + TaxRate)
-            decimal itemsTotal = BillItems.Sum(item => item.GetTotalWithTax());
+            // Calculate from bill items
+            SubTotal = _billItems.Sum(item => item.GetNetAmount()); // Price after item discounts
 
-            SubTotal = itemsTotal;
+            // Item-level discounts
+            decimal itemLevelDiscount = _billItems.Sum(item => item.DiscountAmount);
 
-            // Simple bill-level discount
-            DiscountAmount = SubTotal * (DiscountPercentage / 100);
+            // Bill-level discount
+            decimal billLevelDiscount = SubTotal * (DiscountPercentage / 100);
 
-            // Tax already included in itemsTotal, so no need to recalculate
-            TaxAmount = BillItems
-                .Where(item => item.IsTaxable)
-                .Sum(item => item.TaxAmount);
+            DiscountAmount = itemLevelDiscount + billLevelDiscount;
 
-            TotalAmount = SubTotal - DiscountAmount;
+            // Tax from items
+            TaxAmount = _billItems.Sum(item => item.TaxAmount);
+
+            // Totals
+            TotalAmount = SubTotal + TaxAmount - billLevelDiscount; // SubTotal already has item discounts
             DueAmount = TotalAmount - PaidAmount;
         }
 
@@ -260,7 +340,7 @@ namespace CompileCares.Core.Entities.Billing
         public void UpdateDiscount(decimal discountPercentage, Guid? updatedBy = null)
         {
             if (discountPercentage < 0 || discountPercentage > 100)
-                throw new ArgumentException("Discount percentage must be between 0 and 100");
+                throw new ArgumentException("Discount percentage must be between 0 and 100", nameof(discountPercentage));
 
             DiscountPercentage = discountPercentage;
             CalculateTotals();
@@ -273,7 +353,7 @@ namespace CompileCares.Core.Entities.Billing
         public void UpdateTax(decimal taxPercentage, Guid? updatedBy = null)
         {
             if (taxPercentage < 0)
-                throw new ArgumentException("Tax percentage cannot be negative");
+                throw new ArgumentException("Tax percentage cannot be negative", nameof(taxPercentage));
 
             TaxPercentage = taxPercentage;
             CalculateTotals();
@@ -290,10 +370,10 @@ namespace CompileCares.Core.Entities.Billing
             Guid? updatedBy = null)
         {
             if (amount <= 0)
-                throw new ArgumentException("Payment amount must be positive");
+                throw new ArgumentException("Payment amount must be positive", nameof(amount));
 
             if (string.IsNullOrWhiteSpace(paymentMode))
-                throw new ArgumentException("Payment mode is required");
+                throw new ArgumentException("Payment mode is required", nameof(paymentMode));
 
             PaidAmount += amount;
             PaymentMode = paymentMode;
@@ -370,7 +450,7 @@ namespace CompileCares.Core.Entities.Billing
                 throw new InvalidOperationException("Can only refund paid or partially paid bills");
 
             if (refundAmount <= 0)
-                throw new ArgumentException("Refund amount must be positive");
+                throw new ArgumentException("Refund amount must be positive", nameof(refundAmount));
 
             if (refundAmount > PaidAmount)
                 throw new InvalidOperationException($"Refund amount cannot exceed paid amount ({PaidAmount})");
@@ -394,9 +474,18 @@ namespace CompileCares.Core.Entities.Billing
         // Get total doctor commission from all items
         public decimal GetTotalDoctorCommission()
         {
-            return BillItems
+            return _billItems
                 .Where(item => item.DoctorCommission.HasValue)
                 .Sum(item => item.DoctorCommission.Value);
+        }
+
+        // Set notes
+        public void SetNotes(string notes, Guid? updatedBy = null)
+        {
+            Notes = notes;
+
+            if (updatedBy.HasValue)
+                SetUpdatedBy(updatedBy.Value);
         }
 
         // Factory method for testing
@@ -405,9 +494,10 @@ namespace CompileCares.Core.Entities.Billing
             Guid opdVisitId,
             Guid patientId,
             Guid doctorId,
-            decimal consultationFee)
+            decimal consultationFee,
+            Guid consultationItemMasterId)
         {
-            var bill = new OPDBill(opdVisitId, patientId, doctorId, consultationFee);
+            var bill = new OPDBill(opdVisitId, patientId, doctorId, consultationFee, consultationItemMasterId);
             bill.SetId(id);
             return bill;
         }

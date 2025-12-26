@@ -30,7 +30,26 @@ namespace CompileCares.Infrastructure.Repositories
         {
             _context = context;
         }
-
+        public DbContext GetDbContext() => _context;
+        public async Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> operation)
+        {
+            var executionStrategy = _context.Database.CreateExecutionStrategy();
+            return await executionStrategy.ExecuteAsync(async () =>
+            {
+                await using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    var result = await operation();
+                    await transaction.CommitAsync();
+                    return result;
+                }
+                catch
+                {
+                    // Auto-rollback on dispose
+                    throw;
+                }
+            });
+        }
         // Generic Repository Accessor
         public IRepository<T> Repository<T>() where T : BaseEntity
         {
@@ -84,6 +103,7 @@ namespace CompileCares.Infrastructure.Repositories
             }
 
             _transaction = await _context.Database.BeginTransactionAsync();
+
             return _transaction;
         }
 

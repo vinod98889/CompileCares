@@ -12,9 +12,28 @@ namespace CompileCares.Infrastructure.Data
 {
     public class ApplicationDbContext : DbContext
     {
+        // ✅ ADD THIS: Parameterless constructor for design-time (migrations)
+        public ApplicationDbContext()
+        {
+        }
+
+        // Your existing constructor
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options)
         {
+        }
+
+        // ✅ ADD THIS: OnConfiguring method for design-time migrations
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            if (!optionsBuilder.IsConfigured)
+            {
+                // This connection string is ONLY used during design-time (migrations)
+                // It should match your appsettings.json
+                optionsBuilder.UseSqlServer(
+                    "Server=UMESH\\SQLEXPRESS;Database=CompileCareDB;Trusted_Connection=True;TrustServerCertificate=True;",
+                    sqlOptions => sqlOptions.MigrationsAssembly("CompileCares.Infrastructure"));
+            }
         }
 
         // ========== PATIENT RELATED ==========

@@ -75,19 +75,38 @@ namespace CompileCares.Core.Entities.Clinical
 
         // Main Constructor
         public OPDVisit(
-            Guid patientId,
-            Guid doctorId,
-            VisitType visitType = VisitType.New,
-            Guid? createdBy = null)
+    Guid patientId,
+    Guid doctorId,
+    VisitType visitType = VisitType.New,
+    Guid? createdBy = null)
         {
+            Console.WriteLine($"=== NEW OPDVisit CONSTRUCTOR ===");
+            Console.WriteLine($"Constructor called at: {DateTime.UtcNow:HH:mm:ss.fff}");
+            Console.WriteLine($"New ID generated: {Id}");
+            Console.WriteLine($"PrescriptionId before init: {PrescriptionId}");
+            Console.WriteLine($"PrescriptionId.HasValue: {PrescriptionId.HasValue}");
+            Console.WriteLine($"Prescription reference: {Prescription != null}");
+
             ValidateInput(patientId, doctorId);
 
             PatientId = patientId;
             DoctorId = doctorId;
             VisitType = visitType;
             VisitDate = DateTime.UtcNow;
-            Status = VisitStatus.CheckedIn; // Automatically checked in when created
+            Status = VisitStatus.CheckedIn;
             VisitNumber = GenerateVisitNumber();
+
+            // EXPLICITLY set to null
+            PrescriptionId = null;
+            OPDBillId = null;
+            Diagnosis = null;
+            ChiefComplaint = null;
+
+            Console.WriteLine($"After explicit null set:");
+            Console.WriteLine($"PrescriptionId: {PrescriptionId}");
+            Console.WriteLine($"PrescriptionId == null: {PrescriptionId == null}");
+            Console.WriteLine($"PrescriptionId.HasValue: {PrescriptionId.HasValue}");
+            Console.WriteLine($"=== END CONSTRUCTOR ===");
 
             if (createdBy.HasValue)
                 SetCreatedBy(createdBy.Value);
@@ -298,10 +317,28 @@ namespace CompileCares.Core.Entities.Clinical
         // Link prescription (called from Prescription entity)
         public void LinkPrescription(Prescription prescription)
         {
-            if (Prescription != null)
-                throw new InvalidOperationException("This visit already has a prescription");
+            Console.WriteLine($"=== LinkPrescription (FIXED) ===");
+            Console.WriteLine($"Visit ID: {Id}");
+            Console.WriteLine($"Visit.PrescriptionId: {PrescriptionId}");
+            Console.WriteLine($"Prescription to link ID: {prescription.Id}");
 
-            Prescription = prescription;
+            // Only check if we have a DIFFERENT prescription ID
+            if (PrescriptionId.HasValue && PrescriptionId.Value != prescription.Id)
+            {
+                throw new InvalidOperationException(
+                    $"Visit already has different prescription: {PrescriptionId.Value}");
+            }
+
+            // If it's the SAME prescription ID, we're already linked
+            if (PrescriptionId.HasValue && PrescriptionId.Value == prescription.Id)
+            {
+                Console.WriteLine($"Already linked to same prescription");
+                return;
+            }
+
+            // Set foreign key (navigation property is already set by EF)
+            PrescriptionId = prescription.Id;
+            Console.WriteLine($"Set PrescriptionId to {prescription.Id}");
         }
 
         // Link bill

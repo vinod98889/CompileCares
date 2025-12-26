@@ -43,5 +43,8 @@ namespace CompileCares.Application.Features.Consultations.DTOs
 
         // Notes
         public string? ConsultationNotes { get; set; }
+
+        public bool OverrideExisting { get; set; } = false;
+        public bool AllowMultipleVisitsPerDay { get; set; } = true;
     }
 }

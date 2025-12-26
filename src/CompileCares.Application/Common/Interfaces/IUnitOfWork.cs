@@ -1,5 +1,6 @@
 ﻿using CompileCares.Application.Interfaces;
 using CompileCares.Core.Common;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using System.Data;
 
@@ -9,7 +10,7 @@ namespace CompileCares.Application.Common.Interfaces
     {
         // Generic Repository
         IRepository<T> Repository<T>() where T : BaseEntity;
-
+        DbContext GetDbContext();
         // Specific Repositories
         IPatientRepository Patients { get; }
         IDoctorRepository Doctors { get; }
@@ -21,6 +22,7 @@ namespace CompileCares.Application.Common.Interfaces
 
         // Transaction methods
         Task<IDbContextTransaction> BeginTransactionAsync();
+        Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> operation);
         Task<IDbContextTransaction> BeginTransactionAsync(IsolationLevel isolationLevel);
         Task CommitTransactionAsync();
         Task RollbackTransactionAsync();

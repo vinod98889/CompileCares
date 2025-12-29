@@ -1,16 +1,21 @@
 ﻿using CompileCares.Application.Common.Exceptions;
 using CompileCares.Application.Common.Interfaces;
+using CompileCares.Application.Features.Billing.DTOs;
 using CompileCares.Application.Features.Consultations.DTOs;
+using CompileCares.Application.Features.Patients.DTOs;
+using CompileCares.Application.Features.Prescriptions.DTOs;
+using CompileCares.Application.Features.Visits.DTOs;
 using CompileCares.Application.Services;
 using CompileCares.Core.Entities.Billing;
 using CompileCares.Core.Entities.Clinical;
 using CompileCares.Core.Entities.Doctors;
+using CompileCares.Core.Entities.Master;
 using CompileCares.Core.Entities.Patients;
 using CompileCares.Core.Entities.Templates;
 using CompileCares.Shared.Enums;
-using System.Text;
-using System.Linq;
 using Microsoft.EntityFrameworkCore; // Add this line
+using System.Linq;
+using System.Text;
 
 namespace CompileCares.Infrastructure.Services
 {
@@ -284,6 +289,11 @@ namespace CompileCares.Infrastructure.Services
 
                     Console.WriteLine($"=== STEP 4: BILLING HANDLING ===");
                     // 4. Create Bill (only if doesn't exist)
+
+                    // First, get or create a consultation OPDItemMaster
+                    var consultationItemMasterId = await GetOrCreateConsultationItemMaster(cancellationToken);
+                    Console.WriteLine($"Using OPDItemMasterId: {consultationItemMasterId}");
+
                     OPDBill bill;
                     var existingBill = (await _unitOfWork.Repository<OPDBill>()
                         .FindAsync(b => b.OPDVisitId == visit.Id))
@@ -303,12 +313,15 @@ namespace CompileCares.Infrastructure.Services
                     else
                     {
                         Console.WriteLine("CREATING NEW BILL");
+
+                        // Use the correct constructor with 5 parameters
                         bill = new OPDBill(
-                            visit.Id,
-                            patient.Id,
-                            request.DoctorId,
-                            request.ConsultationFee,
-                            performedBy);
+                            opdVisitId: visit.Id,
+                            patientId: patient.Id,
+                            doctorId: request.DoctorId,
+                            consultationFee: request.ConsultationFee,
+                            consultationItemMasterId: consultationItemMasterId, // THIS IS REQUIRED!
+                            createdBy: performedBy);
 
                         bill.UpdateDiscount(request.DiscountPercentage, performedBy);
                         bill.UpdateTax(request.TaxPercentage, performedBy);
@@ -393,6 +406,45 @@ namespace CompileCares.Infrastructure.Services
             });
         }
 
+        private async Task<Guid> GetOrCreateConsultationItemMaster(CancellationToken cancellationToken)
+        {
+            try
+            {
+                Console.WriteLine("Looking for Consultation Fee in OPDItemMasters...");
+
+                // Check for existing
+                var consultationItems = await _unitOfWork.Repository<OPDItemMaster>()
+                    .FindAsync(x => x.ItemType == "Consultation" && x.IsActive, cancellationToken);
+
+                var consultationItem = consultationItems.FirstOrDefault();
+
+                if (consultationItem != null)
+                {
+                    Console.WriteLine($"Found: {consultationItem.ItemName} (ID: {consultationItem.Id})");
+                    return consultationItem.Id;
+                }
+
+                Console.WriteLine("Creating new consultation item...");
+
+                // Create new item
+                var newItem = new OPDItemMaster(
+                    itemCode: $"CONS-{DateTime.UtcNow:yyyyMMdd}",
+                    itemName: "Consultation Fee",
+                    itemType: "Consultation",
+                    standardPrice: 500.00m,
+                    createdBy: Guid.Parse("00000000-0000-0000-0000-000000000001"));
+
+                await _unitOfWork.Repository<OPDItemMaster>().AddAsync(newItem, cancellationToken);
+                Console.WriteLine($"Created: {newItem.ItemName} (ID: {newItem.Id})");
+
+                return newItem.Id;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ERROR: {ex.Message}");
+                throw;
+            }
+        }
         // Helper method to update visit details
         private void UpdateVisitDetails(OPDVisit visit, CompleteConsultationRequest request, Guid performedBy)
         {
@@ -782,9 +834,159 @@ namespace CompileCares.Infrastructure.Services
         }
 
         // Mapping methods (simplified for brevity)
-        private Application.Features.Patients.DTOs.PatientDto MapToPatientDto(Patient patient) => new();
-        private Application.Features.Visits.DTOs.OPDVisitDto MapToVisitDto(OPDVisit visit) => new();
-        private async Task<Application.Features.Prescriptions.DTOs.PrescriptionDetailDto> MapToPrescriptionDetailDto(Prescription prescription) => new();
-        private async Task<Application.Features.Billing.DTOs.BillDetailDto> MapToBillDetailDto(OPDBill bill) => new();
+        private PatientDto MapToPatientDto(Patient patient)
+        {
+            if (patient == null) return null;
+
+            return new PatientDto
+            {
+                Id = patient.Id,
+                PatientNumber = patient.PatientNumber,
+                Name = patient.Name,
+                Title = patient.Title,
+                Gender = patient.Gender,
+                DateOfBirth = patient.DateOfBirth,
+                Age = patient.Age,
+                MaritalStatus = patient.MaritalStatus,
+                Status = patient.Status,
+                Mobile = patient.Mobile,
+                Email = patient.Email,
+                Address = patient.Address,
+                City = patient.City,
+                Pincode = patient.Pincode,
+                BloodGroup = patient.BloodGroup,
+                Allergies = patient.Allergies,
+                EmergencyContactName = patient.EmergencyContactName,
+                EmergencyContactPhone = patient.EmergencyContactPhone,
+                Occupation = patient.Occupation,
+                CreatedAt = patient.CreatedAt,
+                IsActive = patient.IsActive
+            };
+        }
+        private OPDVisitDto MapToVisitDto(OPDVisit visit)
+        {
+            if (visit == null) return null;
+
+            return new OPDVisitDto
+            {
+                Id = visit.Id,
+                VisitNumber = visit.VisitNumber,
+                VisitDate = visit.VisitDate,
+                VisitType = visit.VisitType,
+                Status = visit.Status,
+                PatientId = visit.PatientId,                
+                DoctorId = visit.DoctorId,                                
+                ChiefComplaint = visit.ChiefComplaint,
+                HistoryOfPresentIllness = visit.HistoryOfPresentIllness,
+                PastMedicalHistory = visit.PastMedicalHistory,
+                FamilyHistory = visit.FamilyHistory,
+                ClinicalNotes = visit.ClinicalNotes,
+                Diagnosis = visit.Diagnosis,
+                TreatmentPlan = visit.TreatmentPlan,
+                BloodPressure = visit.BloodPressure,
+                Temperature = visit.Temperature,
+                Pulse = visit.Pulse,
+                RespiratoryRate = visit.RespiratoryRate,
+                Weight = visit.Weight,
+                Height = visit.Height,
+                BMI = visit.BMI,
+                GeneralExamination = visit.GeneralExamination,
+                SystemicExamination = visit.SystemicExamination,
+                LocalExamination = visit.LocalExamination,
+                InvestigationsOrdered = visit.InvestigationsOrdered,
+                Advice = visit.Advice,
+                FollowUpInstructions = visit.FollowUpInstructions,
+                FollowUpDate = visit.FollowUpDate,
+                FollowUpDays = visit.FollowUpDays,
+                ReferredToDoctorId = visit.ReferredToDoctorId,                
+                ReferralReason = visit.ReferralReason,
+                OPDBillId = visit.OPDBillId,                
+                ConsultationDuration = visit.ConsultationDuration,
+                CreatedAt = visit.CreatedAt,
+                UpdatedAt = visit.UpdatedAt
+            };
+        }
+        private async Task<PrescriptionDetailDto> MapToPrescriptionDetailDto(Prescription prescription)
+        {
+            if (prescription == null) return null;
+
+            var dto = new PrescriptionDetailDto
+            {
+                Id = prescription.Id,
+                PrescriptionNumber = prescription.PrescriptionNumber,
+                PrescriptionDate = prescription.PrescriptionDate,
+                PatientId = prescription.PatientId,                
+                DoctorId = prescription.DoctorId,                
+                OPDVisitId = prescription.OPDVisitId,                
+                Diagnosis = prescription.Diagnosis,
+                Instructions = prescription.Instructions,
+                FollowUpInstructions = prescription.FollowUpInstructions,
+                Status = prescription.Status,
+                ValidityDays = prescription.ValidityDays,
+                ValidUntil = prescription.ValidUntil,                
+                CreatedAt = prescription.CreatedAt,
+                UpdatedAt = prescription.UpdatedAt,                
+            };
+
+            // Map related collections if needed
+            if (prescription.Medicines != null)
+            {
+                dto.Medicines = prescription.Medicines.Select(m => new PrescriptionMedicineDto
+                {
+                    // Map medicine properties
+                }).ToList();
+            }
+
+            // Similar for complaints and advised items
+
+            return dto;
+        }
+        private async Task<BillDetailDto> MapToBillDetailDto(OPDBill bill)
+        {
+            if (bill == null) return null;
+
+            var dto = new BillDetailDto
+            {
+                Id = bill.Id,
+                BillNumber = bill.BillNumber,
+                BillDate = bill.BillDate,
+                Status = bill.Status,
+                OPDVisitId = bill.OPDVisitId,                
+                PatientId = bill.PatientId,                
+                DoctorId = bill.DoctorId,                
+                ConsultationFee = bill.ConsultationFee,
+                ProcedureFee = bill.ProcedureFee,
+                MedicineFee = bill.MedicineFee,
+                LabTestFee = bill.LabTestFee,
+                OtherCharges = bill.OtherCharges,
+                SubTotal = bill.SubTotal,
+                DiscountAmount = bill.DiscountAmount,
+                DiscountPercentage = bill.DiscountPercentage,
+                TaxAmount = bill.TaxAmount,
+                TaxPercentage = bill.TaxPercentage,
+                TotalAmount = bill.TotalAmount,
+                PaidAmount = bill.PaidAmount,
+                DueAmount = bill.DueAmount,
+                PaymentMode = bill.PaymentMode,
+                TransactionId = bill.TransactionId,
+                InsuranceProvider = bill.InsuranceProvider,
+                InsurancePolicyNumber = bill.InsurancePolicyNumber,
+                InsuranceCoveredAmount = bill.InsuranceCoveredAmount,                
+                Notes = bill.Notes,                
+                CreatedAt = bill.CreatedAt,
+                UpdatedAt = bill.UpdatedAt,                
+            };
+
+            // Map bill items if needed
+            if (bill.BillItems != null)
+            {
+                dto.Items = bill.BillItems.Select(i => new BillItemDto
+                {
+                    // Map item properties
+                }).ToList();
+            }
+
+            return dto;
+        }
     }
 }

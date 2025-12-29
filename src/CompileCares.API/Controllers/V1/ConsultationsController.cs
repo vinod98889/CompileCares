@@ -2,10 +2,26 @@
 using CompileCares.Application.Features.Consultations.DTOs;
 using CompileCares.Application.Features.Patients.DTOs;
 using CompileCares.Application.Services;
+using CompileCares.Core.Entities.Doctors;
 using Microsoft.AspNetCore.Mvc;
+using System.Numerics;
+using static Azure.Core.HttpHeader;
 
 namespace CompileCares.API.Controllers
 {
+
+    //POST    /api/consultations/complete                       # Full consultation
+    //POST    /api/consultations/quick                          # Quick consultation  
+    //POST    /api/consultations/ultra-quick                    # Ultra-quick consultation
+    //POST    /api/consultations/template                       # Apply template
+
+    //GET     /api/consultations/{id/}/summary                  # Get summary
+    //GET     /api/consultations/{id}/print                     # Print slip
+
+    //GET     /api/consultations/doctor/{id}/today/stats        # Today's stats
+    //GET     /api/consultations/doctor/{id}/common - diagnoses # Common diagnoses (from start date)
+    //GET     /api/consultations/dashboard                      # Full dashboard
+
     [ApiController]
     [Route("api/[controller]")]
     public class ConsultationsController : ControllerBase
@@ -21,217 +37,99 @@ namespace CompileCares.API.Controllers
             _logger = logger;
         }
 
-        // POST: api/consultations/complete
+        // ========== CONSULTATION CREATION ENDPOINTS ==========
+
+        /// <summary>
+        /// Complete consultation with full details
+        /// </summary>
         [HttpPost("complete")]
         [ProducesResponseType(typeof(ApiResponse<ConsultationResult>), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> CompleteConsultation(
             [FromBody] CompleteConsultationRequest request,
             [FromHeader(Name = "X-User-Id")] Guid? userId = null)
         {
-            try
+            return await HandleConsultationCreation(async () =>
             {
-                if (!ModelState.IsValid)
-                {
-                    var errors = ModelState.Values
-                        .SelectMany(v => v.Errors)
-                        .Select(e => e.ErrorMessage)
-                        .ToList();
-
-                    return BadRequest(ApiResponse.ErrorResponse("Validation failed", errors));
-                }
-
-                var performedBy = userId ?? GetCurrentUserId();
-                if (performedBy == Guid.Empty)
-                {
-                    return Unauthorized(ApiResponse.ErrorResponse("Doctor not authenticated"));
-                }
-
+                var performedBy = GetAndValidateUserId(userId);
                 _logger.LogInformation("Starting complete consultation for doctor: {DoctorId}", request.DoctorId);
 
-                var result = await _consultationService.CompleteConsultationAsync(
-                    request,
-                    performedBy);
-
-                _logger.LogInformation("Consultation completed. Visit: {VisitId}", result.ConsultationId);
-
-                return CreatedAtAction(
-                    nameof(GetConsultationSummary),
-                    new { visitId = result.ConsultationId },
-                    ApiResponse<ConsultationResult>.SuccessResponse(
-                        result,
-                        "Consultation completed successfully"));
-            }
-            catch (ArgumentException ex)
-            {
-                _logger.LogWarning(ex, "Invalid arguments in complete consultation");
-                return BadRequest(ApiResponse.ErrorResponse(ex.Message));
-            }
-            catch (Application.Common.Exceptions.NotFoundException ex)
-            {
-                _logger.LogWarning(ex, "Resource not found in complete consultation");
-                return NotFound(ApiResponse.ErrorResponse(ex.Message));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error completing consultation");
-                return StatusCode(500, ApiResponse.ErrorResponse("An error occurred while completing consultation"));
-            }
+                return await _consultationService.CompleteConsultationAsync(request, performedBy);
+            }, "Consultation completed successfully");
         }
 
-        // POST: api/consultations/test-ultra-quick (TEST ENDPOINT)
-        [HttpPost("test-ultra-quick")]
-        [ProducesResponseType(typeof(ApiResponse<ConsultationResult>), StatusCodes.Status201Created)]
-        public async Task<IActionResult> TestUltraQuickConsultation()
-        {
-            try
-            {
-                var performedBy = Guid.Parse("22222222-2222-2222-2222-222222222222");
-
-                _logger.LogInformation("TEST ULTRA-QUICK consultation");
-
-                // Use hardcoded GUIDs for testing
-                var completeRequest = new CompleteConsultationRequest
-                {
-                    IsNewPatient = true,
-                    NewPatient = new PatientQuickCreateRequest
-                    {
-                        Name = "Test Patient",
-                        Mobile = "9876543210",
-                        Gender = Shared.Enums.Gender.Male
-                    },
-                    DoctorId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
-                    ConsultationDetails = new Application.Features.Visits.DTOs.UpdateVisitRequest
-                    {
-                        ChiefComplaint = "Fever and cold",
-                        Diagnosis = "Viral Infection"
-                    },
-                    Medicines = new List<Application.Features.Prescriptions.DTOs.AddMedicineRequest>
-            {
-                new Application.Features.Prescriptions.DTOs.AddMedicineRequest
-                {
-                    MedicineId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), // Test medicine
-                    DoseId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),     // Test dose
-                    DurationDays = 5,
-                    Quantity = 1,
-                    Instructions = "After food"
-                }
-            },
-                    ConsultationFee = 300,
-                    Payment = new Application.Features.Billing.DTOs.AddPaymentRequest
-                    {
-                        Amount = 300,
-                        PaymentMode = "Cash",
-                        TransactionId = $"TEST_{DateTime.UtcNow:yyyyMMddHHmmss}"
-                    },
-                    ConsultationNotes = "Test consultation",
-                    SetFollowUp = true,
-                    FollowUpDays = 3,
-                    FollowUpInstructions = "Return if fever persists"
-                };
-
-                var result = await _consultationService.CompleteConsultationAsync(
-                    completeRequest,
-                    performedBy);
-
-                _logger.LogInformation("TEST completed! Visit: {VisitId}", result.ConsultationId);
-
-                return CreatedAtAction(
-                    nameof(GetConsultationSummary),
-                    new { visitId = result.ConsultationId },
-                    ApiResponse<ConsultationResult>.SuccessResponse(
-                        result,
-                        "Test consultation completed successfully"));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in test consultation");
-                return StatusCode(500, ApiResponse.ErrorResponse($"Test error: {ex.Message}"));
-            }
-        }
-        // POST: api/consultations/quick
+        /// <summary>
+        /// Quick consultation for existing patients
+        /// </summary>
         [HttpPost("quick")]
         [ProducesResponseType(typeof(ApiResponse<ConsultationResult>), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> QuickConsultation(
             [FromBody] QuickConsultationRequest request,
             [FromHeader(Name = "X-User-Id")] Guid? userId = null)
         {
-            try
+            if (!ModelState.IsValid)
+                return BadRequest(ApiResponse.ErrorResponse("Validation failed", GetModelStateErrors()));
+
+            return await HandleConsultationCreation(async () =>
             {
-                if (!ModelState.IsValid)
-                {
-                    var errors = ModelState.Values
-                        .SelectMany(v => v.Errors)
-                        .Select(e => e.ErrorMessage)
-                        .ToList();
+                var performedBy = GetAndValidateUserId(userId);
+                _logger.LogInformation("Starting quick consultation for patient: {PatientId}", request.PatientId);
 
-                    return BadRequest(ApiResponse.ErrorResponse("Validation failed", errors));
-                }
-
-                var performedBy = userId ?? GetCurrentUserId();
-                if (performedBy == Guid.Empty)
-                {
-                    return Unauthorized(ApiResponse.ErrorResponse("Doctor not authenticated"));
-                }
-
-                _logger.LogInformation("Starting quick consultation");
-
-                // Convert QuickConsultationRequest to CompleteConsultationRequest
-                var completeRequest = ConvertToCompleteConsultationRequest(request);
-
-                var result = await _consultationService.CompleteConsultationAsync(
-                    completeRequest,
-                    performedBy);
-
-                _logger.LogInformation("Quick consultation completed. Visit: {VisitId}", result.ConsultationId);
-
-                return CreatedAtAction(
-                    nameof(GetConsultationSummary),
-                    new { visitId = result.ConsultationId },
-                    ApiResponse<ConsultationResult>.SuccessResponse(
-                        result,
-                        "Quick consultation completed successfully"));
-            }
-            catch (ArgumentException ex)
-            {
-                _logger.LogWarning(ex, "Invalid arguments in quick consultation");
-                return BadRequest(ApiResponse.ErrorResponse(ex.Message));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in quick consultation");
-                return StatusCode(500, ApiResponse.ErrorResponse("An error occurred while processing quick consultation"));
-            }
+                var completeRequest = ConvertQuickToCompleteRequest(request);
+                return await _consultationService.CompleteConsultationAsync(completeRequest, performedBy);
+            }, "Quick consultation completed successfully");
         }
 
-        // POST: api/consultations/template
+        /// <summary>
+        /// Ultra-quick consultation for small clinics (supports new/existing patients)
+        /// </summary>
+        [HttpPost("ultra-quick")]
+        [ProducesResponseType(typeof(ApiResponse<ConsultationResult>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> UltraQuickConsultation(
+            [FromBody] UltraQuickConsultationRequest request,
+            [FromHeader(Name = "X-User-Id")] Guid? userId = null)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ApiResponse.ErrorResponse("Validation failed", GetModelStateErrors()));
+
+            return await HandleConsultationCreation(async () =>
+            {
+                var performedBy = GetAndValidateUserId(userId);
+                _logger.LogInformation("ULTRA-QUICK consultation for patient: {PatientName}",
+                    request.IsNewPatient ? request.NewPatient?.Name : "Existing");
+
+                var completeRequest = ConvertUltraQuickToCompleteRequest(request);
+                return await _consultationService.CompleteConsultationAsync(completeRequest, performedBy);
+            }, "Ultra-quick consultation completed successfully");
+        }
+
+        /// <summary>
+        /// Apply a saved consultation template
+        /// </summary>
         [HttpPost("template")]
         [ProducesResponseType(typeof(ApiResponse<ConsultationResult>), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> ApplyTemplateConsultation(
             [FromBody] TemplateConsultationRequest request,
             [FromHeader(Name = "X-User-Id")] Guid? userId = null)
         {
+            if (!ModelState.IsValid)
+                return BadRequest(ApiResponse.ErrorResponse("Validation failed", GetModelStateErrors()));
+
+            var performedBy = GetAndValidateUserId(userId);
+            if (performedBy == Guid.Empty)
+                return Unauthorized(ApiResponse.ErrorResponse("Doctor not authenticated"));
+
             try
             {
-                if (!ModelState.IsValid)
-                {
-                    var errors = ModelState.Values
-                        .SelectMany(v => v.Errors)
-                        .Select(e => e.ErrorMessage)
-                        .ToList();
-
-                    return BadRequest(ApiResponse.ErrorResponse("Validation failed", errors));
-                }
-
-                var performedBy = userId ?? GetCurrentUserId();
-                if (performedBy == Guid.Empty)
-                {
-                    return Unauthorized(ApiResponse.ErrorResponse("Doctor not authenticated"));
-                }
-
                 _logger.LogInformation("Applying template consultation. Template: {TemplateId}", request.TemplateId);
 
                 var result = await _consultationService.ApplyTemplateConsultationAsync(
@@ -261,97 +159,11 @@ namespace CompileCares.API.Controllers
             }
         }
 
-        // POST: api/consultations/ultra-quick (SPECIAL FOR SMALL CLINIC)
-        [HttpPost("ultra-quick")]
-        [ProducesResponseType(typeof(ApiResponse<ConsultationResult>), StatusCodes.Status201Created)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> UltraQuickConsultation(
-            [FromBody] UltraQuickConsultationRequest request,
-            [FromHeader(Name = "X-User-Id")] Guid? userId = null)
-        {
-            try
-            {
-                if (!ModelState.IsValid)
-                {
-                    var errors = ModelState.Values
-                        .SelectMany(v => v.Errors)
-                        .Select(e => e.ErrorMessage)
-                        .ToList();
+        // ========== CONSULTATION RETRIEVAL ENDPOINTS ==========
 
-                    return BadRequest(ApiResponse.ErrorResponse("Validation failed", errors));
-                }
-
-                var performedBy = userId ?? GetCurrentUserId();
-                if (performedBy == Guid.Empty)
-                {
-                    return Unauthorized(ApiResponse.ErrorResponse("Doctor not authenticated"));
-                }
-
-                _logger.LogInformation("ULTRA-QUICK consultation for patient: {PatientName}",
-                    request.IsNewPatient ? request.NewPatient?.Name : "Existing");
-
-                // Convert to CompleteConsultationRequest
-                var completeRequest = new CompleteConsultationRequest
-                {
-                    IsNewPatient = request.IsNewPatient,
-                    NewPatient = request.NewPatient != null ? new PatientQuickCreateRequest
-                    {
-                        Name = request.NewPatient.Name,
-                        Mobile = request.NewPatient.Mobile,
-                        Gender = request.NewPatient.Gender
-                    } : null,
-                    ExistingPatientId = request.ExistingPatientId,
-                    DoctorId = request.DoctorId,
-                    ConsultationDetails = new Application.Features.Visits.DTOs.UpdateVisitRequest
-                    {
-                        ChiefComplaint = request.ChiefComplaint,
-                        Diagnosis = request.Diagnosis,
-                        BloodPressure = request.BloodPressure,
-                        Temperature = request.Temperature,
-                        Pulse = request.Pulse
-                    },
-                    Medicines = request.Medicines.Select(m => new Application.Features.Prescriptions.DTOs.AddMedicineRequest
-                    {
-                        MedicineId = m.MedicineId,
-                        DoseId = m.DoseId,
-                        DurationDays = m.DurationDays,
-                        Quantity = m.Quantity,
-                        Instructions = m.Instructions
-                    }).ToList(),
-                    ConsultationFee = request.ConsultationFee,
-                    Payment = new Application.Features.Billing.DTOs.AddPaymentRequest
-                    {
-                        Amount = request.ConsultationFee,
-                        PaymentMode = "Cash",
-                        TransactionId = $"UQ_{DateTime.UtcNow:yyyyMMddHHmmss}"
-                    },
-                    ConsultationNotes = "Ultra-quick consultation",
-                    SetFollowUp = request.SetFollowUp,
-                    FollowUpDays = request.FollowUpDays,
-                    FollowUpInstructions = request.FollowUpInstructions
-                };
-
-                var result = await _consultationService.CompleteConsultationAsync(
-                    completeRequest,
-                    performedBy);
-
-                _logger.LogInformation("ULTRA-QUICK completed! Visit: {VisitId}", result.ConsultationId);
-
-                return CreatedAtAction(
-                    nameof(GetConsultationSummary),
-                    new { visitId = result.ConsultationId },
-                    ApiResponse<ConsultationResult>.SuccessResponse(
-                        result,
-                        "Ultra-quick consultation completed successfully"));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in ultra-quick consultation");
-                return StatusCode(500, ApiResponse.ErrorResponse("An error occurred in ultra-quick consultation"));
-            }
-        }
-
-        // GET: api/consultations/{visitId}/summary
+        /// <summary>
+        /// Get consultation summary by visit ID
+        /// </summary>
         [HttpGet("{visitId}/summary")]
         [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
@@ -360,8 +172,8 @@ namespace CompileCares.API.Controllers
             try
             {
                 _logger.LogInformation("Getting consultation summary for visit: {VisitId}", visitId);
-
                 var summary = await _consultationService.GenerateConsultationSummaryAsync(visitId);
+
 
                 return Ok(ApiResponse<string>.SuccessResponse(
                     summary,
@@ -379,7 +191,9 @@ namespace CompileCares.API.Controllers
             }
         }
 
-        // GET: api/consultations/{visitId}/print
+        /// <summary>
+        /// Generate printable consultation slip
+        /// </summary>
         [HttpGet("{visitId}/print")]
         [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
@@ -388,7 +202,6 @@ namespace CompileCares.API.Controllers
             try
             {
                 _logger.LogInformation("Generating print slip for visit: {VisitId}", visitId);
-
                 var slip = await _consultationService.PrintCombinedSlipAsync(visitId);
 
                 return Ok(ApiResponse<string>.SuccessResponse(
@@ -407,51 +220,43 @@ namespace CompileCares.API.Controllers
             }
         }
 
-        // GET: api/consultations/doctor/{doctorId}/today/count
-        [HttpGet("doctor/{doctorId}/today/count")]
-        [ProducesResponseType(typeof(ApiResponse<int>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetTodaysConsultationsCount(Guid doctorId)
+        // ========== STATISTICS ENDPOINTS ==========
+
+        /// <summary>
+        /// Get today's consultation statistics for a doctor
+        /// </summary>
+        [HttpGet("doctor/{doctorId}/today/stats")]
+        [ProducesResponseType(typeof(ApiResponse<TodaysStatsDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetTodaysStats(Guid doctorId)
         {
             try
             {
-                _logger.LogInformation("Getting today's consultation count for doctor: {DoctorId}", doctorId);
+                _logger.LogInformation("Getting today's stats for doctor: {DoctorId}", doctorId);
 
                 var count = await _consultationService.GetTodaysConsultationsCountAsync(doctorId);
-
-                return Ok(ApiResponse<int>.SuccessResponse(
-                    count,
-                    $"Today's consultations: {count}"));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting today's consultation count for doctor: {DoctorId}", doctorId);
-                return StatusCode(500, ApiResponse.ErrorResponse("An error occurred while retrieving consultation count"));
-            }
-        }
-
-        // GET: api/consultations/doctor/{doctorId}/today/revenue
-        [HttpGet("doctor/{doctorId}/today/revenue")]
-        [ProducesResponseType(typeof(ApiResponse<decimal>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetTodaysRevenue(Guid doctorId)
-        {
-            try
-            {
-                _logger.LogInformation("Getting today's revenue for doctor: {DoctorId}", doctorId);
-
                 var revenue = await _consultationService.GetTodaysRevenueAsync(doctorId);
 
-                return Ok(ApiResponse<decimal>.SuccessResponse(
-                    revenue,
-                    $"Today's revenue: ₹{revenue:N2}"));
+                var stats = new TodaysStatsDto
+                {
+                    Date = DateTime.UtcNow.Date,
+                    ConsultationCount = count,
+                    TotalRevenue = count
+                };
+
+                return Ok(ApiResponse<TodaysStatsDto>.SuccessResponse(
+                    stats,
+                    $"Today's stats retrieved - {stats.ConsultationCount} consultations, ₹{stats.TotalRevenue:N2} revenue"));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting today's revenue for doctor: {DoctorId}", doctorId);
-                return StatusCode(500, ApiResponse.ErrorResponse("An error occurred while retrieving today's revenue"));
+                _logger.LogError(ex, "Error getting today's stats for doctor: {DoctorId}", doctorId);
+                return StatusCode(500, ApiResponse.ErrorResponse("An error occurred while retrieving today's stats"));
             }
         }
 
-        // GET: api/consultations/doctor/{doctorId}/common-diagnoses
+        /// <summary>
+        /// Get common diagnoses for a doctor from a specific start date
+        /// </summary>
         [HttpGet("doctor/{doctorId}/common-diagnoses")]
         [ProducesResponseType(typeof(ApiResponse<Dictionary<string, int>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetCommonDiagnoses(
@@ -478,7 +283,9 @@ namespace CompileCares.API.Controllers
             }
         }
 
-        // GET: api/consultations/dashboard
+        /// <summary>
+        /// Get comprehensive consultation dashboard
+        /// </summary>
         [HttpGet("dashboard")]
         [ProducesResponseType(typeof(ApiResponse<ConsultationDashboardDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetConsultationDashboard(
@@ -492,17 +299,19 @@ namespace CompileCares.API.Controllers
                 _logger.LogInformation("Getting dashboard for doctor: {DoctorId} on {Date}",
                     doctorId, dashboardDate);
 
-                var todayCount = await _consultationService.GetTodaysConsultationsCountAsync(doctorId);
-                var todayRevenue = await _consultationService.GetTodaysRevenueAsync(doctorId);
-                var commonDiagnoses = await _consultationService.GetCommonDiagnosesAsync(doctorId, dashboardDate.AddDays(-7));
+                var countTask = _consultationService.GetTodaysConsultationsCountAsync(doctorId);
+                var revenueTask = _consultationService.GetTodaysRevenueAsync(doctorId);
+                var diagnosesTask = _consultationService.GetCommonDiagnosesAsync(doctorId, dashboardDate.AddDays(-7));
+
+                await Task.WhenAll(countTask, revenueTask, diagnosesTask);
 
                 var dashboard = new ConsultationDashboardDto
                 {
                     Date = dashboardDate,
                     DoctorId = doctorId,
-                    TodaysConsultationCount = todayCount,
-                    TodaysRevenue = todayRevenue,
-                    CommonDiagnoses = commonDiagnoses,
+                    TodaysConsultationCount = await countTask,
+                    TodaysRevenue = await revenueTask,
+                    CommonDiagnoses = await diagnosesTask,
                     AverageConsultationTime = "15 min",
                     PatientSatisfaction = "95%",
                     FollowUpAppointments = 3
@@ -519,14 +328,67 @@ namespace CompileCares.API.Controllers
             }
         }
 
-        // Helper Methods
-        private CompleteConsultationRequest ConvertToCompleteConsultationRequest(QuickConsultationRequest request)
+        // ========== HELPER METHODS ==========
+
+        private async Task<IActionResult> HandleConsultationCreation(
+            Func<Task<ConsultationResult>> consultationAction,
+            string successMessage)
         {
-            // This is a placeholder - you need to implement this based on your logic
-            // For now, return a basic CompleteConsultationRequest
+            try
+            {
+                var result = await consultationAction();
+
+                _logger.LogInformation("Consultation completed. Visit: {VisitId}", result.ConsultationId);
+
+                return CreatedAtAction(
+                    nameof(GetConsultationSummary),
+                    new { visitId = result.ConsultationId },
+                    ApiResponse<ConsultationResult>.SuccessResponse(result, successMessage));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid arguments in consultation");
+                return BadRequest(ApiResponse.ErrorResponse(ex.Message));
+            }
+            catch (Application.Common.Exceptions.NotFoundException ex)
+            {
+                _logger.LogWarning(ex, "Resource not found in consultation");
+                return NotFound(ApiResponse.ErrorResponse(ex.Message));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Doctor not authenticated");
+                return Unauthorized(ApiResponse.ErrorResponse(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error completing consultation");
+                return StatusCode(500, ApiResponse.ErrorResponse("An error occurred while completing consultation"));
+            }
+        }
+
+        private Guid GetAndValidateUserId(Guid? userId)
+        {
+            var performedBy = userId ?? GetCurrentUserId();
+            if (performedBy == Guid.Empty)
+                throw new UnauthorizedAccessException("Doctor not authenticated");
+
+            return performedBy;
+        }
+
+        private List<string> GetModelStateErrors()
+        {
+            return ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .ToList();
+        }
+
+        private CompleteConsultationRequest ConvertQuickToCompleteRequest(QuickConsultationRequest request)
+        {
             return new CompleteConsultationRequest
             {
-                IsNewPatient = false, // Assuming existing patient for quick consultation
+                IsNewPatient = false,
                 ExistingPatientId = request.PatientId,
                 DoctorId = request.DoctorId,
                 ConsultationDetails = new Application.Features.Visits.DTOs.UpdateVisitRequest
@@ -546,16 +408,58 @@ namespace CompileCares.API.Controllers
             };
         }
 
+        private CompleteConsultationRequest ConvertUltraQuickToCompleteRequest(UltraQuickConsultationRequest request)
+        {
+            return new CompleteConsultationRequest
+            {
+                IsNewPatient = request.IsNewPatient,
+                NewPatient = request.NewPatient != null ? new PatientQuickCreateRequest
+                {
+                    Name = request.NewPatient.Name,
+                    Mobile = request.NewPatient.Mobile,
+                    Gender = request.NewPatient.Gender
+                } : null,
+                ExistingPatientId = request.ExistingPatientId,
+                DoctorId = request.DoctorId,
+                ConsultationDetails = new Application.Features.Visits.DTOs.UpdateVisitRequest
+                {
+                    ChiefComplaint = request.ChiefComplaint,
+                    Diagnosis = request.Diagnosis,
+                    BloodPressure = request.BloodPressure,
+                    Temperature = request.Temperature,
+                    Pulse = request.Pulse
+                },
+                Medicines = request.Medicines.Select(m => new Application.Features.Prescriptions.DTOs.AddMedicineRequest
+                {
+                    MedicineId = m.MedicineId,
+                    DoseId = m.DoseId,
+                    DurationDays = m.DurationDays,
+                    Quantity = m.Quantity,
+                    Instructions = m.Instructions
+                }).ToList(),
+                ConsultationFee = request.ConsultationFee,
+                Payment = new Application.Features.Billing.DTOs.AddPaymentRequest
+                {
+                    Amount = request.ConsultationFee,
+                    PaymentMode = "Cash",
+                    TransactionId = $"UQ_{DateTime.UtcNow:yyyyMMddHHmmss}"
+                },
+                ConsultationNotes = "Ultra-quick consultation",
+                SetFollowUp = request.SetFollowUp,
+                FollowUpDays = request.FollowUpDays,
+                FollowUpInstructions = request.FollowUpInstructions
+            };
+        }
+
         private Guid GetCurrentUserId()
         {
-            // TODO: Replace with actual authentication
             if (Request.Headers.TryGetValue("X-User-Id", out var userIdHeader) &&
                 Guid.TryParse(userIdHeader, out var userId))
             {
                 return userId;
             }
 
-            return Guid.Parse("22222222-2222-2222-2222-222222222222"); // Clinic Doctor ID
+            return Guid.Empty; // Return empty for unauthenticated users
         }
     }
 }

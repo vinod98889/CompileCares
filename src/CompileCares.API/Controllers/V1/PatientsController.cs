@@ -2,8 +2,11 @@
 using CompileCares.Application.Common.DTOs;
 using CompileCares.Application.Features.Patients.DTOs;
 using CompileCares.Application.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using static System.Net.Mime.MediaTypeNames;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Diagnostics;
+using System.Security.Claims;
 
 namespace CompileCares.API.Controllers
 {
@@ -22,17 +25,27 @@ namespace CompileCares.API.Controllers
             _logger = logger;
         }
 
-        // GET: api/patients/{id}
+        // GET: api/v1/patients/{id}
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(ApiResponse<PatientDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ResponseCache(Duration = 30)] // Cache for 30 seconds
         public async Task<IActionResult> GetPatient(Guid id)
         {
+            var stopwatch = Stopwatch.StartNew();
+
+            if (id == Guid.Empty)
+                return BadRequest(ApiResponse.ErrorResponse("Invalid patient ID"));
+
             try
             {
                 _logger.LogInformation("Getting patient with ID: {PatientId}", id);
 
                 var patient = await _patientService.GetPatientAsync(id);
+
+                _logger.LogInformation("Patient retrieved successfully in {ElapsedMs}ms",
+                    stopwatch.ElapsedMilliseconds);
 
                 return Ok(ApiResponse<PatientDto>.SuccessResponse(
                     patient,
@@ -50,82 +63,81 @@ namespace CompileCares.API.Controllers
             }
         }
 
-        // POST: api/patients
+        // POST: api/v1/patients
         [HttpPost]
+        [RequestSizeLimit(10 * 1024 * 1024)] // 10MB
         [ProducesResponseType(typeof(ApiResponse<PatientDto>), StatusCodes.Status201Created)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> CreatePatient(
-            [FromBody] CreatePatientRequest request,
-            [FromHeader(Name = "X-User-Id")] Guid? userId = null)
+            [FromBody] CreatePatientRequest request)
         {
+            var stopwatch = Stopwatch.StartNew();
+            var userId = GetCurrentUserId();
+
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(new ValidationProblemDetails(ModelState)
+                {
+                    Title = "Validation failed",
+                    Detail = "One or more validation errors occurred"
+                });
+            }
+
             try
             {
-                if (!ModelState.IsValid)
-                {
-                    var errors = ModelState.Values
-                        .SelectMany(v => v.Errors)
-                        .Select(e => e.ErrorMessage)
-                        .ToList();
+                _logger.LogInformation("Creating patient: {PatientName} by User: {UserId}",
+                    request.Name, userId);
 
-                    return BadRequest(ApiResponse.ErrorResponse("Validation failed", errors));
-                }
+                var patient = await _patientService.CreatePatientAsync(request, userId);
 
-                // Use provided userId or get from authentication context
-                var createdBy = userId ?? GetCurrentUserId();
-
-                if (createdBy == Guid.Empty)
-                {
-                    return Unauthorized(ApiResponse.ErrorResponse("User not authenticated"));
-                }
-
-                _logger.LogInformation("Creating patient: {PatientName}", request.Name);
-
-                var patient = await _patientService.CreatePatientAsync(request, createdBy);
+                _logger.LogInformation("Patient created successfully in {ElapsedMs}ms",
+                    stopwatch.ElapsedMilliseconds);
 
                 return CreatedAtAction(
                     nameof(GetPatient),
-                    new { id = patient.Id },
+                    new { id = patient.Id, version = "1.0" },
                     ApiResponse<PatientDto>.SuccessResponse(patient, "Patient created successfully"));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating patient: {PatientName}", request.Name);
+                _logger.LogError(ex, "Error creating patient: {PatientName} by User: {UserId}",
+                    request.Name, userId);
                 return StatusCode(500, ApiResponse.ErrorResponse("An error occurred while creating patient"));
             }
         }
 
-        // PUT: api/patients/{id}
+        // PUT: api/v1/patients/{id}
         [HttpPut("{id}")]
+        [RequestSizeLimit(10 * 1024 * 1024)]
         [ProducesResponseType(typeof(ApiResponse<PatientDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> UpdatePatient(
             Guid id,
-            [FromBody] UpdatePatientRequest request,
-            [FromHeader(Name = "X-User-Id")] Guid? userId = null)
+            [FromBody] UpdatePatientRequest request)
         {
+            var stopwatch = Stopwatch.StartNew();
+            var userId = GetCurrentUserId();
+
+            if (id == Guid.Empty)
+                return BadRequest(ApiResponse.ErrorResponse("Invalid patient ID"));
+
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(new ValidationProblemDetails(ModelState));
+            }
+
             try
             {
-                if (!ModelState.IsValid)
-                {
-                    var errors = ModelState.Values
-                        .SelectMany(v => v.Errors)
-                        .Select(e => e.ErrorMessage)
-                        .ToList();
+                _logger.LogInformation("Updating patient with ID: {PatientId} by User: {UserId}",
+                    id, userId);
 
-                    return BadRequest(ApiResponse.ErrorResponse("Validation failed", errors));
-                }
+                var patient = await _patientService.UpdatePatientAsync(id, request, userId);
 
-                var updatedBy = userId ?? GetCurrentUserId();
-
-                if (updatedBy == Guid.Empty)
-                {
-                    return Unauthorized(ApiResponse.ErrorResponse("User not authenticated"));
-                }
-
-                _logger.LogInformation("Updating patient with ID: {PatientId}", id);
-
-                var patient = await _patientService.UpdatePatientAsync(id, request, updatedBy);
+                _logger.LogInformation("Patient updated successfully in {ElapsedMs}ms",
+                    stopwatch.ElapsedMilliseconds);
 
                 return Ok(ApiResponse<PatientDto>.SuccessResponse(
                     patient,
@@ -143,16 +155,32 @@ namespace CompileCares.API.Controllers
             }
         }
 
-        // GET: api/patients/search
+        // GET: api/v1/patients/search
         [HttpGet("search")]
+        [AllowAnonymous]
+        [ResponseCache(Duration = 10, VaryByQueryKeys = new[] { "*" })]
         [ProducesResponseType(typeof(ApiResponse<PagedResponse<PatientSummaryDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> SearchPatients([FromQuery] PatientSearchRequest request)
         {
+            var stopwatch = Stopwatch.StartNew();
+
             try
             {
                 _logger.LogInformation("Searching patients with term: {SearchTerm}", request.SearchTerm);
 
                 var result = await _patientService.SearchPatientsAsync(request);
+
+                // Log both current page count and total records
+                _logger.LogInformation(
+                    "Patient search completed in {ElapsedMs}ms. " +
+                    "Returned {CurrentCount} results (page {PageNumber}/{TotalPages}), " +
+                    "Total records: {TotalRecords}",
+                    stopwatch.ElapsedMilliseconds,
+                    result.Data.Count(),           // Records in current page
+                    result.PageNumber,
+                    result.TotalPages,
+                    result.TotalRecords            // Total records in database
+                );
 
                 return Ok(ApiResponse<PagedResponse<PatientSummaryDto>>.SuccessResponse(
                     result,
@@ -165,26 +193,27 @@ namespace CompileCares.API.Controllers
             }
         }
 
-        // DELETE: api/patients/{id}/deactivate
+        // DELETE: api/v1/patients/{id}/deactivate
         [HttpDelete("{id}/deactivate")]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> DeactivatePatient(
-            Guid id,
-            [FromHeader(Name = "X-User-Id")] Guid? userId = null)
+        public async Task<IActionResult> DeactivatePatient(Guid id)
         {
+            var userId = GetCurrentUserId();
+
+            if (id == Guid.Empty)
+                return BadRequest(ApiResponse.ErrorResponse("Invalid patient ID"));
+
             try
             {
-                var deactivatedBy = userId ?? GetCurrentUserId();
+                _logger.LogWarning("Patient deactivation requested for ID: {PatientId} by User: {UserId}",
+                    id, userId);
 
-                if (deactivatedBy == Guid.Empty)
-                {
-                    return Unauthorized(ApiResponse.ErrorResponse("User not authenticated"));
-                }
+                var success = await _patientService.DeactivatePatientAsync(id, userId);
 
-                _logger.LogInformation("Deactivating patient with ID: {PatientId}", id);
-
-                var success = await _patientService.DeactivatePatientAsync(id, deactivatedBy);
+                _logger.LogWarning("Patient deactivated successfully for ID: {PatientId} by User: {UserId}",
+                    id, userId);
 
                 return Ok(ApiResponse.SuccessResponse("Patient deactivated successfully"));
             }
@@ -195,13 +224,15 @@ namespace CompileCares.API.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deactivating patient with ID: {PatientId}", id);
+                _logger.LogError(ex, "Error deactivating patient with ID: {PatientId} by User: {UserId}",
+                    id, userId);
                 return StatusCode(500, ApiResponse.ErrorResponse("An error occurred while deactivating patient"));
             }
         }
 
-        // GET: api/patients/statistics
+        // GET: api/v1/patients/statistics
         [HttpGet("statistics")]
+        [ResponseCache(Duration = 60)] // Cache for 1 minute
         [ProducesResponseType(typeof(ApiResponse<PatientStatisticsDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetPatientStatistics()
         {
@@ -222,22 +253,30 @@ namespace CompileCares.API.Controllers
             }
         }
 
-        // Helper method to get current user ID (placeholder - implement authentication later)
+        // GET: api/v1/patients/health
+        [HttpGet("health")]
+        [AllowAnonymous]
+        public IActionResult HealthCheck()
+        {
+            return Ok(new
+            {
+                status = "Healthy",
+                service = "Patients API",
+                timestamp = DateTime.UtcNow,
+                version = "1.0"
+            });
+        }
+
+        // Secure method to get current user ID
         private Guid GetCurrentUserId()
         {
-            // TODO: Replace with actual authentication
-            // For now, return a dummy user ID or get from JWT token
-
-            // Check if we have a user ID in the header (for testing)
-            if (Request.Headers.TryGetValue("X-User-Id", out var userIdHeader) &&
-                Guid.TryParse(userIdHeader, out var userId))
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) ||
+                !Guid.TryParse(userIdClaim, out var userId))
             {
-                return userId;
+                throw new UnauthorizedAccessException("User not authenticated");
             }
-
-            // Return a default user ID for development
-            // In production, this should throw if no user is authenticated
-            return Guid.Parse("11111111-1111-1111-1111-111111111111");
+            return userId;
         }
     }
 }

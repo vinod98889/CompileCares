@@ -1,0 +1,45 @@
+﻿@inherits LayoutComponentBase
+
+<div class="page">
+   @*  <div class="sidebar">
+        <NavMenu />
+    </div> *@
+    
+    <main>
+        <HorizontalMenu />
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+<style>
+    /* Remove MudBlazor default spacing */
+    .mud-layout {
+        gap: 0 !important;
+    }
+
+    .mud-main-content {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Uniform padding on all sides */
+    .uniform-padding {
+        padding: 1rem !important; /* Same on all sides */
+    }
+
+    /* Alternative with specific values */
+    .content {
+        padding-top: 1rem !important;
+        padding-right: 1rem !important;
+        padding-bottom: 1rem !important;
+        padding-left: 1rem !important;
+    }
+
+    /* Ensure main has no additional spacing */
+    main {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+</style>

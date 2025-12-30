@@ -1,0 +1,453 @@
+﻿@page "/"
+
+<div class="medical-container">
+    <!-- Main Grid Layout -->
+    <div class="main-grid">
+        <!-- Left Column -->
+        <div class="left-column">
+            <!-- Patient Info Card -->
+            <div class="compact-card">
+                <div class="card-header">
+                    <i class="fas fa-user"></i>
+                    <h3>Patient Information</h3>
+                </div>
+                <div class="compact-form">
+                    <div class="form-row">
+                        <div class="input-group">
+                            <label>Gender</label>
+                            <select class="form-input">
+                                <option>Male</option>
+                                <option>Female</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Age</label>
+                            <input type="text" class="form-input" placeholder="Age">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="input-group search-group">
+                            <label>Patient Name</label>
+                            <div class="search-container">
+                                <i class="fas fa-search search-icon"></i>
+                                <input type="text" class="form-input" placeholder="Search patient...">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="input-group">
+                            <label>Mobile</label>
+                            <input type="text" class="form-input" placeholder="91">
+                        </div>
+                        <div class="input-group">
+                            <label>Other</label>
+                            <input type="text" class="form-input" placeholder="...">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Address Card -->
+            <div class="compact-card">
+                <div class="card-header">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <h3>Address</h3>
+                </div>
+                <textarea class="form-textarea" placeholder="Patient address..." rows="2"></textarea>
+            </div>
+
+            <!-- Visit Signs Card -->
+            <div class="compact-card">
+                <div class="card-header">
+                    <i class="fas fa-heartbeat"></i>
+                    <h3>Visit Signs</h3>
+                </div>
+                <div class="vitals-grid">
+                    <div class="vital-item">
+                        <label>BP</label>
+                        <input type="text" class="form-input" placeholder="120/40">
+                    </div>
+                    <div class="vital-item">
+                        <label>SPO2</label>
+                        <input type="number" class="form-input" placeholder="100">
+                    </div>
+                    <div class="vital-item">
+                        <label>Temp °C</label>
+                        <input type="number" class="form-input" placeholder="35">
+                    </div>
+                    <div class="vital-item">
+                        <label>Weight</label>
+                        <input type="number" class="form-input" placeholder="75kg">
+                    </div>
+                    <div class="vital-item">
+                        <label>Dignosis</label>
+                        <input type="text" class="form-input" placeholder="Suger...">
+                    </div>
+                    <div class="vital-item">
+                        <label>Other</label>
+                        <input type="text" class="form-input" placeholder="None">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Column -->
+        <div class="center-column">
+            <!-- Medicine Prescription with Template Search -->
+            <div class="compact-card">
+                <div class="card-header-with-template">
+                    <div class="card-header">
+                        <i class="fas fa-pills"></i>
+                        <h3>Medicine Prescription</h3>
+                    </div>
+                    <div class="template-search">
+                        <div class="search-container">
+                            <i class="fas fa-search search-icon"></i>
+                            <input type="text" class="form-input template-input" placeholder="Search templates...">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="medicine-controls">
+                    <div class="input-group">
+                        <div class="search-container">
+                            <i class="fas fa-search search-icon"></i>
+                            <input type="text" class="form-input" placeholder="Search medicine">
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <select class="form-input">
+                            <option>Select Dose</option>
+                            <option>500mg</option>
+                            <option>250mg</option>
+                            <option>100mg</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <input type="text" class="form-input" placeholder="Gly">
+                    </div>
+                    <button class="btn btn-primary btn-small">
+                        <i class="fas fa-plus"></i>
+                        Add
+                    </button>
+                </div>
+
+                <!-- Medicine Table -->
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Medicine</th>
+                                <th>Dose</th>
+                                <th>Gly</th>
+                                <th class="action-col">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Vitamin C</td>
+                                <td>100mg</td>
+                                <td>1-0-1</td>
+                                <td>
+                                    <button class="icon-btn danger" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Omeprazole</td>
+                                <td>20mg</td>
+                                <td>1-0-0</td>
+                                <td>
+                                    <button class="icon-btn danger" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Diclofenac</td>
+                                <td>50mg</td>
+                                <td>1-0-1</td>
+                                <td>
+                                    <button class="icon-btn danger" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Montelukast</td>
+                                <td>10mg</td>
+                                <td>0-0-1</td>
+                                <td>
+                                    <button class="icon-btn danger" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Medical Advice Section -->
+                <div class="advice-section">
+                    <div class="input-group">
+                        <label>Medical Advice</label>
+                        <select class="form-input">
+                            <option>Select Medical Advice</option>
+                            <option>Take medicine after food</option>
+                            <option>Do not eat after 6PM</option>
+                            <option>Drink plenty of water</option>
+                            <option>Take complete rest</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OPD History with Date Filter -->
+            <div class="compact-card">
+                <div class="card-header-with-template">
+                    <div class="card-header">
+                        <i class="fas fa-history"></i>
+                        <h3>OPD History</h3>
+                    </div>
+                    <div class="date-filter-controls">
+                        <div class="date-input-group">
+                            @* <label>Start Date</label> *@
+                            <div class="date-container">
+                                <i class="fas fa-calendar date-icon"></i>
+                                <input type="date" class="form-input date-input">
+                            </div>
+                        </div>
+                        <div class="date-input-group">
+                            @*  <label>End Date</label> *@
+                            <div class="date-container">
+                                <i class="fas fa-calendar date-icon"></i>
+                                <input type="date" class="form-input date-input">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary btn-view">
+                            <i class="fas fa-eye"></i>
+                            View
+                        </button>
+                    </div>
+                </div>
+                <div class="table-container small-table">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Complaint</th>
+                                <th>Medicine</th>
+                                <th class="action-col">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>12/15/23</td>
+                                <td>Fever, Headache</td>
+                                <td>Paracetamol</td>
+                                <td>
+                                    <button class="icon-btn primary" title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>12/10/23</td>
+                                <td>Cough & Cold</td>
+                                <td>Amoxicillin</td>
+                                <td>
+                                    <button class="icon-btn primary" title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>12/05/23</td>
+                                <td>Stomach Pain</td>
+                                <td>Antacid</td>
+                                <td>
+                                    <button class="icon-btn primary" title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>12/15/23</td>
+                                <td>Fever, Headache</td>
+                                <td>Paracetamol</td>
+                                <td>
+                                    <button class="icon-btn primary" title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>12/10/23</td>
+                                <td>Cough & Cold</td>
+                                <td>Amoxicillin</td>
+                                <td>
+                                    <button class="icon-btn primary" title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>12/05/23</td>
+                                <td>Stomach Pain</td>
+                                <td>Antacid</td>
+                                <td>
+                                    <button class="icon-btn primary" title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="right-column">
+            <!-- Patient Complaints - Simplified -->
+            <div class="compact-card">
+                <div class="card-header">
+                    <i class="fas fa-comment-medical"></i>
+                    <h3>Patient Complaints</h3>
+                </div>
+                <div class="complaints-controls-simple">
+                    <div class="input-group">
+                        <div class="search-container">
+                            <i class="fas fa-search search-icon"></i>
+                            <input type="text" class="form-input" placeholder="Search complaints...">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary btn-small">
+                        <i class="fas fa-plus"></i>
+                        Add
+                    </button>
+                </div>
+                <div class="table-container small-table">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Complaint</th>
+                                <th class="action-col">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>High Fever</td>
+                                <td>
+                                    <button class="icon-btn danger" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Headache</td>
+                                <td>
+                                    <button class="icon-btn danger" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Body Ache</td>
+                                <td>
+                                    <button class="icon-btn danger" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Loss of Appetite</td>
+                                <td>
+                                    <button class="icon-btn danger" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- History & Follow Up -->
+            <div class="compact-card">
+                <div class="card-header">
+                    <i class="fas fa-notes-medical"></i>
+                    <h3>History & Follow Up</h3>
+                </div>
+                <textarea class="form-textarea" placeholder="Follow up notes, next visit instructions, patient progress..." rows="5"></textarea>
+            </div>
+
+            <!-- Compact Actions -->
+            <div class="compact-card">
+                <div class="card-header">
+                    <i class="fas fa-tasks"></i>
+                    <h3>Actions</h3>
+                </div>
+                <div class="action-buttons-compact">
+                    <div class="action-group">
+                        <button class="btn btn-success btn-compact" title="Save Prescription">
+                            <i class="fas fa-save"></i>
+                            Save
+                        </button>
+                        <button class="btn btn-primary btn-compact" title="Save and Print">
+                            <i class="fas fa-print"></i>
+                            Print
+                        </button>
+                    </div>
+                    <div class="action-group">
+                        <button class="btn btn-info btn-compact" title="Print Bill">
+                            <i class="fas fa-file-invoice"></i>
+                            Bill
+                        </button>
+                        <button class="btn btn-danger btn-compact" title="Clear All">
+                            <i class="fas fa-broom"></i>
+                            Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Input focus effects
+    document.querySelectorAll('.form-input, .form-textarea').forEach(input => {
+        input.addEventListener('focus', function() {
+            this.parentElement.classList.add('focused');
+        });
+
+        input.addEventListener('blur', function() {
+            this.parentElement.classList.remove('focused');
+        });
+    });
+
+    // Set default dates for date filters
+    document.addEventListener('DOMContentLoaded', function() {
+        const startDateInput = document.querySelector('.date-filter-controls input[type="date"]:first-child');
+        const endDateInput = document.querySelector('.date-filter-controls input[type="date"]:last-child');
+
+        // Set start date to 30 days ago
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        startDateInput.valueAsDate = thirtyDaysAgo;
+
+        // Set end date to today
+        endDateInput.valueAsDate = new Date();
+    });
+
+    // View button functionality
+    document.querySelector('.btn-view').addEventListener('click', function() {
+        const startDate = document.querySelector('.date-filter-controls input[type="date"]:first-child').value;
+        const endDate = document.querySelector('.date-filter-controls input[type="date"]:last-child').value;
+
+        console.log('Filtering OPD History from:', startDate, 'to:', endDate);
+        // Add your filter logic here
+    });
+</script>

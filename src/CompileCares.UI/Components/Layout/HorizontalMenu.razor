@@ -1,4 +1,4 @@
-﻿<!-- Main Navigation Bar -->
+﻿    <!-- Main Navigation Bar -->
 <nav class="medical-navbar">
     <div class="nav-container">
         <!-- Logo -->
@@ -9,218 +9,181 @@
 
         <!-- Main Menu -->
         <ul class="nav-menu">
-            <!-- OPD Dropdown -->
-            <li class="nav-item dropdown">
-                <a href="#" class="nav-link">
+            <!-- OPD -->
+            <li class="nav-item">
+                <a href="/" class="nav-link">
                     <i class="fas fa-stethoscope"></i>
                     OPD
-                    <i class="fas fa-chevron-down dropdown-arrow"></i>
                 </a>
-                <div class="dropdown-menu">
-                    <a href="#" class="dropdown-item">
-                        <i class="fas fa-user-injured"></i>
-                        New Patient
-                    </a>
-                    <a href="#" class="dropdown-item">
-                        <i class="fas fa-list"></i>
-                        Patient List
-                    </a>
-                    <a href="#" class="dropdown-item">
-                        <i class="fas fa-prescription"></i>
-                        Prescription
-                    </a>
-                    <div class="dropdown-divider"></div>
-                    <a href="#" class="dropdown-item">
-                        <i class="fas fa-chart-line"></i>
-                        OPD Reports
-                    </a>
-                </div>
             </li>
-
-            <!-- TEMPLATE Dropdown -->
-            <li class="nav-item dropdown">
-                <a href="#" class="nav-link">
+            <!-- Template -->
+            <li class="nav-item">
+                <a href="/template" class="nav-link">
                     <i class="fas fa-file-medical"></i>
-                    TEMPLATE
-                    <i class="fas fa-chevron-down dropdown-arrow"></i>
+                    Template
                 </a>
-                <div class="dropdown-menu">
-                    <a href="#" class="dropdown-item">
-                        <i class="fas fa-plus-square"></i>
-                        Create Template
-                    </a>
-                    <a href="#" class="dropdown-item">
-                        <i class="fas fa-copy"></i>
-                        Template Library
-                    </a>
-                    <a href="#" class="dropdown-item">
-                        <i class="fas fa-edit"></i>
-                        Manage Templates
-                    </a>
-                </div>
             </li>
-
-            <!-- LAB Mega Dropdown -->
             <li class="nav-item mega-dropdown">
                 <a href="#" class="nav-link">
-                    <i class="fas fa-flask"></i>
-                    LAB
+                    <i class="fas fa-ellipsis-h"></i>
+                    Other
                     <i class="fas fa-chevron-down dropdown-arrow"></i>
                 </a>
                 <div class="mega-menu">
                     <div class="mega-column">
-                        <h4>Lab Tests</h4>
-                        <a href="#" class="dropdown-item">
+                        <h4>Entites</h4>
+                        <a href="/advised" class="dropdown-item">
+                            <i class="fas fa-clipboard-list"></i>
+                            Advised
+                        </a>
+                        <a href="/complaint" class="dropdown-item">
+                            <i class="fas fa-exclamation-circle"></i>
+                            Complaint
+                        </a>
+                        <a href="/medicine" class="dropdown-item">
+                            <i class="fas fa-pills"></i>
+                            Medicine
+                        </a>
+                        <a href="/dose" class="dropdown-item">
+                            <i class="fas fa-file-invoice"></i>
+                            Dose
+                        </a>
+                    </div>
+                    <div class="mega-column">
+                        <h4>Certificate</h4>
+                        <a href="/certificate" class="dropdown-item">
+                            <i class="fas fa-file-medical-alt"></i>
+                            Medical Certificate
+                        </a>
+                        <a href="/fitness" class="dropdown-item">
+                            <i class="fas fa-heartbeat"></i>
+                            Fitness Certificate
+                        </a>
+                        <a href="/rest" class="dropdown-item">
+                            <i class="fas fa-bed"></i>
+                            Rest Certificate
+                        </a>
+                        <a href="/lama" class="dropdown-item">
+                            <i class="fas fa-stethoscope"></i>
+                            LAMA Certificate
+                        </a>
+                    </div>
+                    <div class="mega-column">
+                        <h4>Lab Management</h4>
+                        <a href="/lab-tests" class="dropdown-item">
                             <i class="fas fa-vial"></i>
-                            Blood Tests
+                            Lab Tests
                         </a>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-urine"></i>
-                            Urine Tests
+                        <a href="/lab-reports" class="dropdown-item">
+                            <i class="fas fa-file-medical-alt"></i>
+                            Lab Reports
                         </a>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-dna"></i>
-                            Pathology
-                        </a>
-                    </div>
-                    <div class="mega-column">
-                        <h4>Reports</h4>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-file-pdf"></i>
-                            Generate Reports
-                        </a>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-history"></i>
-                            Report History
-                        </a>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-print"></i>
-                            Print Reports
-                        </a>
-                    </div>
-                    <div class="mega-column">
-                        <h4>Management</h4>
-                        <a href="#" class="dropdown-item">
+                        <a href="/lab-settings" class="dropdown-item">
                             <i class="fas fa-cog"></i>
                             Lab Settings
                         </a>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-users"></i>
-                            Lab Staff
-                        </a>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-chart-bar"></i>
-                            Lab Analytics
-                        </a>
                     </div>
                 </div>
             </li>
-
-            <!-- OTHER Dropdown -->
-            <li class="nav-item dropdown">
-                <a href="#" class="nav-link">
-                    <i class="fas fa-ellipsis-h"></i>
-                    OTHER
-                    <i class="fas fa-chevron-down dropdown-arrow"></i>
-                </a>
-                <div class="dropdown-menu">
-                    <a href="#" class="dropdown-item">
-                        <i class="fas fa-bed"></i>
-                        Inpatient
-                    </a>
-                    <a href="#" class="dropdown-item">
-                        <i class="fas fa-ambulance"></i>
-                        Emergency
-                    </a>
-                    <a href="#" class="dropdown-item">
-                        <i class="fas fa-x-ray"></i>
-                        Radiology
-                    </a>
-                    <a href="#" class="dropdown-item">
-                        <i class="fas fa-pills"></i>
-                        Pharmacy
-                    </a>
-                </div>
-            </li>
-
-            <!-- CERTIFICATE Dropdown -->
-            <li class="nav-item dropdown">
-                <a href="#" class="nav-link">
-                    <i class="fas fa-certificate"></i>
-                    CERTIFICATE
-                    <i class="fas fa-chevron-down dropdown-arrow"></i>
-                </a>
-                <div class="dropdown-menu">
-                    <a href="#" class="dropdown-item">
-                        <i class="fas fa-file-medical-alt"></i>
-                        Medical Certificate
-                    </a>
-                    <a href="#" class="dropdown-item">
-                        <i class="fas fa-heartbeat"></i>
-                        Fitness Certificate
-                    </a>
-                    <a href="#" class="dropdown-item">
-                        <i class="fas fa-procedures"></i>
-                        Leave Certificate
-                    </a>
-                    <a href="#" class="dropdown-item">
-                        <i class="fas fa-history"></i>
-                        Certificate History
-                    </a>
-                </div>
-            </li>
-
-            <!-- MASTER Mega Dropdown -->
+            <!-- Billing Mega Dropdown -->
             <li class="nav-item mega-dropdown">
                 <a href="#" class="nav-link">
-                    <i class="fas fa-cogs"></i>
-                    MASTER
+                    <i class="fas fa-file-invoice-dollar"></i>
+                    Billing
                     <i class="fas fa-chevron-down dropdown-arrow"></i>
                 </a>
                 <div class="mega-menu">
                     <div class="mega-column">
-                        <h4>System Setup</h4>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-user-md"></i>
-                            Doctor Master
+                        <h4>OPD Billing</h4>
+                        <a href="/opd-billing" class="dropdown-item">
+                            <i class="fas fa-file-invoice-dollar"></i>
+                            OPD Billing Items
                         </a>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-pills"></i>
-                            Medicine Master
-                        </a>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-vial"></i>
-                            Test Master
+                        <a href="/billing-opd" class="dropdown-item">
+                            <i class="fas fa-money-bill-wave"></i>
+                            Billing OPD
                         </a>
                     </div>
                     <div class="mega-column">
-                        <h4>Configuration</h4>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-sliders-h"></i>
-                            System Settings
+                        <h4>IPD Billing</h4>
+                        <a href="/ipd" class="dropdown-item">
+                            <i class="fas fa-procedures"></i>
+                            IPD
                         </a>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-users-cog"></i>
-                            User Management
+                        <a href="/ipd-billing" class="dropdown-item">
+                            <i class="fas fa-file-invoice"></i>
+                            IPD Billing Items
                         </a>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-database"></i>
-                            Database Backup
+                        <a href="/billing-ipd" class="dropdown-item">
+                            <i class="fas fa-receipt"></i>
+                            Billing IPD
                         </a>
                     </div>
                     <div class="mega-column">
                         <h4>Reports & Analytics</h4>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-chart-pie"></i>
-                            Statistics
+                        <a href="/billing-reports" class="dropdown-item">
+                            <i class="fas fa-chart-bar"></i>
+                            Billing Reports
                         </a>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-file-excel"></i>
-                            Export Data
-                        </a>
-                        <a href="#" class="dropdown-item">
+                        <a href="/revenue-analytics" class="dropdown-item">
                             <i class="fas fa-chart-line"></i>
-                            Performance
+                            Revenue Analytics
+                        </a>
+                    </div>
+                </div>
+            </li>
+
+            <!-- Master Mega Dropdown -->
+            <li class="nav-item mega-dropdown">
+                <a href="#" class="nav-link">
+                    <i class="fas fa-cogs"></i>
+                    Master
+                    <i class="fas fa-chevron-down dropdown-arrow"></i>
+                </a>
+                <div class="mega-menu">
+                    <div class="mega-column">
+                        <h4>Patient Management</h4>
+                        <a href="/patient-master" class="dropdown-item">
+                            <i class="fas fa-user-injured"></i>
+                            Patient Master
+                        </a>
+                        <a href="/doctor-master" class="dropdown-item">
+                            <i class="fas fa-user-md"></i>
+                            Doctor Master
+                        </a>
+                        <a href="/staff-master" class="dropdown-item">
+                            <i class="fas fa-user-nurse"></i>
+                            Staff Master
+                        </a>
+                    </div>
+                    <div class="mega-column">
+                        <h4>Inventory & Billing</h4>
+                        <a href="/medicine-master" class="dropdown-item">
+                            <i class="fas fa-pills"></i>
+                            Medicine Master
+                        </a>
+                        <a href="/billing-master" class="dropdown-item">
+                            <i class="fas fa-file-invoice-dollar"></i>
+                            Billing Master
+                        </a>
+                        <a href="/inventory-master" class="dropdown-item">
+                            <i class="fas fa-boxes"></i>
+                            Inventory Master
+                        </a>
+                    </div>
+                    <div class="mega-column">
+                        <h4>System Settings</h4>
+                        <a href="/user-management" class="dropdown-item">
+                            <i class="fas fa-users-cog"></i>
+                            User Management
+                        </a>
+                        <a href="/system-settings" class="dropdown-item">
+                            <i class="fas fa-sliders-h"></i>
+                            System Settings
+                        </a>
+                        <a href="/database-backup" class="dropdown-item">
+                            <i class="fas fa-database"></i>
+                            Database Backup
                         </a>
                     </div>
                 </div>
@@ -274,7 +237,7 @@
         navToggle.classList.toggle('active');
     });
 
-    // Dropdown functionality
+    // Fixed Dropdown functionality
     document.querySelectorAll('.dropdown, .mega-dropdown').forEach(dropdown => {
         const link = dropdown.querySelector('.nav-link');
 
@@ -319,5 +282,3 @@
         });
     });
 </script>
-
-

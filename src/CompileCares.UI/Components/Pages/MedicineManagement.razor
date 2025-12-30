@@ -1,0 +1,411 @@
+﻿@page "/medicine"
+
+
+<div class="container">
+    <!-- Left Panel - Add Medicine Form -->
+    <div class="left-panel">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Add New Medicine</h3>
+            </div>
+
+            <div class="form-group">
+                <label for="searchMedicine">Search Medicine</label>
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchMedicine" class="search-input" placeholder="Search medicine by name...">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="medicineName">Medicine Name</label>
+                <input type="text" id="medicineName" placeholder="Enter medicine name">
+            </div>
+
+            <div class="form-row">
+                <div class="form-control">
+                    <label for="medicineType">Medicine Type</label>
+                    <select id="medicineType">
+                        <option value="">Select Type</option>
+                        <option value="tab">Tablet (Tab)</option>
+                        <option value="sup">Suppository (Sup)</option>
+                        <option value="oil">Oil</option>
+                        <option value="syp">Syrup (Syp)</option>
+                        <option value="cap">Capsule (Cap)</option>
+                        <option value="inj">Injection (Inj)</option>
+                        <option value="cream">Cream</option>
+                        <option value="drop">Drop</option>
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label for="doseType">Dose Type</label>
+                    <select id="doseType">
+                        <option value="">Select Dose Type</option>
+                        <option value="morning">Morning</option>
+                        <option value="evening">Evening</option>
+                        <option value="night">Night</option>
+                        <option value="morning-evening">Morning & Evening</option>
+                        <option value="morning-night">Morning & Night</option>
+                        <option value="evening-night">Evening & Night</option>
+                        <option value="thrice">Thrice Daily</option>
+                        <option value="as-needed">As Needed</option>
+                        <option value="before-food">Before Food</option>
+                        <option value="after-food">After Food</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-control">
+                    <label for="strength">Strength</label>
+                    <input type="text" id="strength" placeholder="e.g., 500mg, 10ml">
+                </div>
+                <div class="form-control">
+                    <label for="manufacturer">Manufacturer</label>
+                    <input type="text" id="manufacturer" placeholder="Manufacturer name">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description (Optional)</label>
+                <input type="text" id="description" placeholder="Additional information about medicine">
+            </div>
+
+            <div class="form-group">
+                <button class="btn btn-primary" id="saveMedicine" style="width: 100%;">
+                    <i class="fas fa-save"></i> Save Medicine
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel - Medicine List -->
+    <div class="right-panel">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Medicine List</h3>
+                <button class="btn btn-outline">
+                    <i class="fas fa-filter"></i> Filter
+                </button>
+            </div>
+            <div class="medicine-list-container">
+                <div class="medicine-list" id="medicineList">
+                    <!-- Medicine 1 -->
+                    <div class="medicine-card">
+                        <div class="medicine-header">
+                            <div class="medicine-name">
+                                <i class="fas fa-chevron-right"></i>
+                                Paracetamol
+                            </div>
+                            <div class="medicine-actions">
+                                <button class="action-btn">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="medicine-details">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">Type</span>
+                                    <span class="detail-value">
+                                        <span class="badge badge-tab">Tablet</span>
+                                    </span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Dose Type</span>
+                                    <span class="detail-value">As Needed</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Strength</span>
+                                    <span class="detail-value">500mg</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Manufacturer</span>
+                                    <span class="detail-value">PharmaCorp</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Medicine 2 -->
+                    <div class="medicine-card">
+                        <div class="medicine-header">
+                            <div class="medicine-name">
+                                <i class="fas fa-chevron-right"></i>
+                                Amoxicillin
+                            </div>
+                            <div class="medicine-actions">
+                                <button class="action-btn">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="medicine-details">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">Type</span>
+                                    <span class="detail-value">
+                                        <span class="badge badge-cap">Capsule</span>
+                                    </span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Dose Type</span>
+                                    <span class="detail-value">Thrice Daily</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Strength</span>
+                                    <span class="detail-value">250mg</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Manufacturer</span>
+                                    <span class="detail-value">MediLife</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Medicine 3 -->
+                    <div class="medicine-card">
+                        <div class="medicine-header">
+                            <div class="medicine-name">
+                                <i class="fas fa-chevron-right"></i>
+                                Cough Syrup
+                            </div>
+                            <div class="medicine-actions">
+                                <button class="action-btn">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="medicine-details">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">Type</span>
+                                    <span class="detail-value">
+                                        <span class="badge badge-syp">Syrup</span>
+                                    </span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Dose Type</span>
+                                    <span class="detail-value">Morning & Night</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Strength</span>
+                                    <span class="detail-value">100ml</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Manufacturer</span>
+                                    <span class="detail-value">HealthCare Ltd</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Medicine 4 -->
+                    <div class="medicine-card">
+                        <div class="medicine-header">
+                            <div class="medicine-name">
+                                <i class="fas fa-chevron-right"></i>
+                                Vitamin D Drops
+                            </div>
+                            <div class="medicine-actions">
+                                <button class="action-btn">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="medicine-details">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">Type</span>
+                                    <span class="detail-value">
+                                        <span class="badge badge-drop">Drop</span>
+                                    </span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Dose Type</span>
+                                    <span class="detail-value">Morning</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Strength</span>
+                                    <span class="detail-value">400 IU</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Manufacturer</span>
+                                    <span class="detail-value">NutraWell</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Medicine 5 -->
+                    <div class="medicine-card">
+                        <div class="medicine-header">
+                            <div class="medicine-name">
+                                <i class="fas fa-chevron-right"></i>
+                                Pain Relief Oil
+                            </div>
+                            <div class="medicine-actions">
+                                <button class="action-btn">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="medicine-details">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">Type</span>
+                                    <span class="detail-value">
+                                        <span class="badge badge-oil">Oil</span>
+                                    </span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Dose Type</span>
+                                    <span class="detail-value">As Needed</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Strength</span>
+                                    <span class="detail-value">50ml</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Manufacturer</span>
+                                    <span class="detail-value">AyurCare</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // DOM elements
+    const searchMedicineInput = document.getElementById('searchMedicine');
+    const medicineNameInput = document.getElementById('medicineName');
+    const medicineTypeSelect = document.getElementById('medicineType');
+    const doseTypeSelect = document.getElementById('doseType');
+    const strengthInput = document.getElementById('strength');
+    const manufacturerInput = document.getElementById('manufacturer');
+    const descriptionInput = document.getElementById('description');
+    const saveMedicineBtn = document.getElementById('saveMedicine');
+    const medicineCards = document.querySelectorAll('.medicine-card');
+
+    // Save medicine functionality
+    saveMedicineBtn.addEventListener('click', function() {
+        const name = medicineNameInput.value.trim();
+        const type = medicineTypeSelect.value;
+        const doseType = doseTypeSelect.value;
+        const strength = strengthInput.value.trim();
+        const manufacturer = manufacturerInput.value.trim();
+
+        if (!name) {
+            alert("Please enter medicine name");
+            return;
+        }
+
+        if (!type) {
+            alert("Please select medicine type");
+            return;
+        }
+
+        if (!doseType) {
+            alert("Please select dose type");
+            return;
+        }
+
+        if (!strength) {
+            alert("Please enter strength");
+            return;
+        }
+
+        // Reset form
+        medicineNameInput.value = '';
+        medicineTypeSelect.value = '';
+        doseTypeSelect.value = '';
+        strengthInput.value = '';
+        manufacturerInput.value = '';
+        descriptionInput.value = '';
+
+        alert("Medicine saved successfully!");
+    });
+
+    // Search functionality
+    searchMedicineInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+
+        medicineCards.forEach(card => {
+            const medicineName = card.querySelector('.medicine-name').textContent.toLowerCase();
+
+            if (medicineName.includes(searchTerm)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+
+    // Medicine card expand/collapse functionality
+    medicineCards.forEach(card => {
+        const header = card.querySelector('.medicine-header');
+
+        header.addEventListener('click', function(e) {
+            // Don't trigger if clicking on action buttons
+            if (e.target.closest('.medicine-actions')) {
+                return;
+            }
+
+            // Close all other medicine cards
+            medicineCards.forEach(otherCard => {
+                if (otherCard !== card) {
+                    otherCard.classList.remove('expanded');
+                }
+            });
+
+            // Toggle current medicine card
+            card.classList.toggle('expanded');
+        });
+    });
+
+    // Edit medicine functionality
+    medicineCards.forEach(card => {
+        const editBtn = card.querySelector('.action-btn:first-child');
+
+        editBtn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent card expansion
+            const medicineName = card.querySelector('.medicine-name').textContent.trim();
+            alert(`Edit medicine: ${medicineName} - This functionality can be implemented`);
+        });
+    });
+
+    // Delete medicine functionality
+    medicineCards.forEach(card => {
+        const deleteBtn = card.querySelector('.action-btn:last-child');
+
+        deleteBtn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent card expansion
+            const medicineName = card.querySelector('.medicine-name').textContent.trim();
+
+            if (confirm(`Are you sure you want to delete ${medicineName}?`)) {
+                card.style.display = 'none';
+                alert(`${medicineName} deleted successfully!`);
+            }
+        });
+    });
+</script>

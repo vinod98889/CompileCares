@@ -1,0 +1,207 @@
+﻿@page "/advised"
+
+<div class="container">
+    <!-- Left Panel - Add Advised Form -->
+    <div class="left-panel">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Add New Advised</h3>
+            </div>
+
+            <div class="form-group">
+                <label for="searchAdvised">Search Advised</label>
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchAdvised" class="search-input" placeholder="Search advised...">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="advisedName">Advised Name</label>
+                <input type="text" id="advisedName" placeholder="Enter advised instructions">
+            </div>
+
+            <div class="form-group">
+                <button class="btn btn-primary" id="saveAdvised" style="width: 100%;">
+                    <i class="fas fa-save"></i> Save Advised
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel - Advised List -->
+    <div class="right-panel">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Advised List</h3>
+                <button class="btn btn-outline">
+                    <i class="fas fa-filter"></i> Filter
+                </button>
+            </div>
+            <div class="list-container">
+                <div class="item-list" id="advisedList">
+                    <!-- Advised 1 -->
+                    <div class="item-card">
+                        <div class="item-header">
+                            <div class="item-name">
+                                <i class="fas fa-chevron-right"></i>
+                                Take after meals
+                            </div>
+                            <div class="item-actions">
+                                <button class="action-btn">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="item-details">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">Type</span>
+                                    <span class="detail-value">General</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Usage Count</span>
+                                    <span class="detail-value">45 times</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Advised 2 -->
+                    <div class="item-card">
+                        <div class="item-header">
+                            <div class="item-name">
+                                <i class="fas fa-chevron-right"></i>
+                                Drink plenty of water
+                            </div>
+                            <div class="item-actions">
+                                <button class="action-btn">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="item-details">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">Type</span>
+                                    <span class="detail-value">General</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Usage Count</span>
+                                    <span class="detail-value">32 times</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Advised 3 -->
+                    <div class="item-card">
+                        <div class="item-header">
+                            <div class="item-name">
+                                <i class="fas fa-chevron-right"></i>
+                                Avoid alcohol
+                            </div>
+                            <div class="item-actions">
+                                <button class="action-btn">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="item-details">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">Type</span>
+                                    <span class="detail-value">Restriction</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Usage Count</span>
+                                    <span class="detail-value">18 times</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Advised functionality
+    const searchAdvisedInput = document.getElementById('searchAdvised');
+    const advisedNameInput = document.getElementById('advisedName');
+    const saveAdvisedBtn = document.getElementById('saveAdvised');
+    const advisedCards = document.querySelectorAll('.item-card');
+
+    saveAdvisedBtn.addEventListener('click', function() {
+        const name = advisedNameInput.value.trim();
+
+        if (!name) {
+            alert("Please enter advised instructions");
+            return;
+        }
+
+        advisedNameInput.value = '';
+        alert("Advised saved successfully!");
+    });
+
+    // Search functionality
+    searchAdvisedInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+
+        advisedCards.forEach(card => {
+            const advisedName = card.querySelector('.item-name').textContent.toLowerCase();
+
+            if (advisedName.includes(searchTerm)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+
+    // Expand/collapse functionality
+    advisedCards.forEach(card => {
+        const header = card.querySelector('.item-header');
+
+        header.addEventListener('click', function(e) {
+            if (e.target.closest('.item-actions')) return;
+
+            advisedCards.forEach(otherCard => {
+                if (otherCard !== card) otherCard.classList.remove('expanded');
+            });
+
+            card.classList.toggle('expanded');
+        });
+    });
+
+    // Edit/Delete functionality
+    advisedCards.forEach(card => {
+        const editBtn = card.querySelector('.action-btn:first-child');
+        const deleteBtn = card.querySelector('.action-btn:last-child');
+
+        editBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const advisedName = card.querySelector('.item-name').textContent.trim();
+            alert(`Edit advised: ${advisedName}`);
+        });
+
+        deleteBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const advisedName = card.querySelector('.item-name').textContent.trim();
+            if (confirm(`Delete ${advisedName}?`)) {
+                card.style.display = 'none';
+                alert(`${advisedName} deleted!`);
+            }
+        });
+    });
+</script>

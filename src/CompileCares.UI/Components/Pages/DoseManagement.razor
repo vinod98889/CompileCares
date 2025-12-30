@@ -1,0 +1,206 @@
+﻿@page "/dose"
+<div class="container">
+    <!-- Left Panel - Add Dose Form -->
+    <div class="left-panel">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Add New Dose</h3>
+            </div>
+
+            <div class="form-group">
+                <label for="searchDose">Search Dose</label>
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchDose" class="search-input" placeholder="Search dose...">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="doseName">Dose Name</label>
+                <input type="text" id="doseName" placeholder="Enter dose name">
+            </div>
+
+            <div class="form-group">
+                <button class="btn btn-primary" id="saveDose" style="width: 100%;">
+                    <i class="fas fa-save"></i> Save Dose
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel - Dose List -->
+    <div class="right-panel">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Dose List</h3>
+                <button class="btn btn-outline">
+                    <i class="fas fa-filter"></i> Filter
+                </button>
+            </div>
+            <div class="list-container">
+                <div class="item-list" id="doseList">
+                    <!-- Dose 1 -->
+                    <div class="item-card">
+                        <div class="item-header">
+                            <div class="item-name">
+                                <i class="fas fa-chevron-right"></i>
+                                Morning
+                            </div>
+                            <div class="item-actions">
+                                <button class="action-btn">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="item-details">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">Timing</span>
+                                    <span class="detail-value">6:00 AM - 8:00 AM</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Usage</span>
+                                    <span class="detail-value">Daily</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dose 2 -->
+                    <div class="item-card">
+                        <div class="item-header">
+                            <div class="item-name">
+                                <i class="fas fa-chevron-right"></i>
+                                Evening
+                            </div>
+                            <div class="item-actions">
+                                <button class="action-btn">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="item-details">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">Timing</span>
+                                    <span class="detail-value">6:00 PM - 8:00 PM</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Usage</span>
+                                    <span class="detail-value">Daily</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dose 3 -->
+                    <div class="item-card">
+                        <div class="item-header">
+                            <div class="item-name">
+                                <i class="fas fa-chevron-right"></i>
+                                Night
+                            </div>
+                            <div class="item-actions">
+                                <button class="action-btn">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="item-details">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">Timing</span>
+                                    <span class="detail-value">9:00 PM - 11:00 PM</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Usage</span>
+                                    <span class="detail-value">Daily</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Dose functionality
+    const searchDoseInput = document.getElementById('searchDose');
+    const doseNameInput = document.getElementById('doseName');
+    const saveDoseBtn = document.getElementById('saveDose');
+    const doseCards = document.querySelectorAll('.item-card');
+
+    saveDoseBtn.addEventListener('click', function() {
+        const name = doseNameInput.value.trim();
+
+        if (!name) {
+            alert("Please enter dose name");
+            return;
+        }
+
+        doseNameInput.value = '';
+        alert("Dose saved successfully!");
+    });
+
+    // Search functionality
+    searchDoseInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+
+        doseCards.forEach(card => {
+            const doseName = card.querySelector('.item-name').textContent.toLowerCase();
+
+            if (doseName.includes(searchTerm)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+
+    // Expand/collapse functionality
+    doseCards.forEach(card => {
+        const header = card.querySelector('.item-header');
+
+        header.addEventListener('click', function(e) {
+            if (e.target.closest('.item-actions')) return;
+
+            doseCards.forEach(otherCard => {
+                if (otherCard !== card) otherCard.classList.remove('expanded');
+            });
+
+            card.classList.toggle('expanded');
+        });
+    });
+
+    // Edit/Delete functionality
+    doseCards.forEach(card => {
+        const editBtn = card.querySelector('.action-btn:first-child');
+        const deleteBtn = card.querySelector('.action-btn:last-child');
+
+        editBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const doseName = card.querySelector('.item-name').textContent.trim();
+            alert(`Edit dose: ${doseName}`);
+        });
+
+        deleteBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const doseName = card.querySelector('.item-name').textContent.trim();
+            if (confirm(`Delete ${doseName}?`)) {
+                card.style.display = 'none';
+                alert(`${doseName} deleted!`);
+            }
+        });
+    });
+</script>

@@ -1,0 +1,339 @@
+﻿@page "/template"
+<div class="container">
+    <!-- Left Panel - Template Form -->
+    <div class="left-panel">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Create New Template</h3>
+            </div>
+
+            <div class="form-group">
+                <label for="templateName">Template Name</label>
+                <input type="text" id="templateName" placeholder="e.g., Fever Template, Cold Template">
+            </div>
+
+            <div class="form-group">
+                <label for="advised">Advised Instructions</label>
+                <select id="advised">
+                    <option value="">Select Advised Instructions</option>
+                    <option value="Take after meals with plenty of water">Take after meals with plenty of water</option>
+                    <option value="Take on empty stomach">Take on empty stomach</option>
+                    <option value="Take before bedtime">Take before bedtime</option>
+                    <option value="Take with milk">Take with milk</option>
+                    <option value="Avoid alcohol while taking this medicine">Avoid alcohol while taking this medicine</option>
+                    <option value="Complete the full course of treatment">Complete the full course of treatment</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Add Medicine</label>
+                <div class="form-row">
+                    <div class="form-control">
+                        <select id="medicineName">
+                            <option value="">Select Medicine</option>
+                            <option value="Paracetamol">Paracetamol</option>
+                            <option value="Ibuprofen">Ibuprofen</option>
+                            <option value="Amoxicillin">Amoxicillin</option>
+                            <option value="Cetirizine">Cetirizine</option>
+                            <option value="Vitamin C">Vitamin C</option>
+                            <option value="Azithromycin">Azithromycin</option>
+                            <option value="Omeprazole">Omeprazole</option>
+                        </select>
+                    </div>
+                    <div class="form-control">
+                        <select id="medicineDose">
+                            <option value="">Select Dose</option>
+                            <option value="250mg">250mg</option>
+                            <option value="500mg">500mg</option>
+                            <option value="750mg">750mg</option>
+                            <option value="1000mg">1000mg</option>
+                            <option value="5ml">5ml</option>
+                            <option value="10ml">10ml</option>
+                        </select>
+                    </div>
+                    <div class="form-control">
+                        <input type="number" id="medicineQty" placeholder="Quantity" min="1" max="100">
+                    </div>
+                </div>
+                <button class="btn btn-outline" id="addMedicine" style="margin-top: 10px;">
+                    <i class="fas fa-plus"></i> Add Medicine
+                </button>
+            </div>
+
+            <div class="form-group">
+                <label>Medicine List</label>
+                <div class="medicine-list" id="medicineList">
+                    <div class="empty-state" id="emptyMedicineList">
+                        <i class="fas fa-pills"></i>
+                        <p>No medicines added yet</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <button class="btn btn-primary" id="saveTemplate" style="width: 100%;">
+                    <i class="fas fa-save"></i> Save Template
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel - Template List -->
+    <div class="right-panel">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Saved Templates</h3>
+            </div>
+            <div class="template-list" id="templateList">
+                <!-- Fever Template -->
+                <div class="template-card">
+                    <div class="template-header">
+                        <div class="template-name">
+                            <i class="fas fa-chevron-right"></i>
+                            Fever Template
+                        </div>
+                        <div class="template-actions">
+                            <button class="action-btn">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="action-btn">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="template-details">
+                        <div class="template-advised">Take after meals with plenty of water. Complete full course.</div>
+                        <div class="medicines-list">
+                            <div class="medicine-item">
+                                <div class="medicine-info">
+                                    <div class="medicine-name">Paracetamol</div>
+                                    <div class="medicine-details">500mg • Qty: 10 tablets</div>
+                                </div>
+                            </div>
+                            <div class="medicine-item">
+                                <div class="medicine-info">
+                                    <div class="medicine-name">Ibuprofen</div>
+                                    <div class="medicine-details">400mg • Qty: 5 tablets</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cold & Cough Template -->
+                <div class="template-card">
+                    <div class="template-header">
+                        <div class="template-name">
+                            <i class="fas fa-chevron-right"></i>
+                            Cold & Cough Template
+                        </div>
+                        <div class="template-actions">
+                            <button class="action-btn">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="action-btn">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="template-details">
+                        <div class="template-advised">Take with warm water. Avoid cold drinks.</div>
+                        <div class="medicines-list">
+                            <div class="medicine-item">
+                                <div class="medicine-info">
+                                    <div class="medicine-name">Cetirizine</div>
+                                    <div class="medicine-details">10mg • Qty: 7 tablets</div>
+                                </div>
+                            </div>
+                            <div class="medicine-item">
+                                <div class="medicine-info">
+                                    <div class="medicine-name">Amoxicillin</div>
+                                    <div class="medicine-details">500mg • Qty: 14 capsules</div>
+                                </div>
+                            </div>
+                            <div class="medicine-item">
+                                <div class="medicine-info">
+                                    <div class="medicine-name">Vitamin C</div>
+                                    <div class="medicine-details">1000mg • Qty: 10 tablets</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Headache Template -->
+                <div class="template-card">
+                    <div class="template-header">
+                        <div class="template-name">
+                            <i class="fas fa-chevron-right"></i>
+                            Headache Template
+                        </div>
+                        <div class="template-actions">
+                            <button class="action-btn">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="action-btn">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="template-details">
+                        <div class="template-advised">Take on empty stomach. Rest in a dark room.</div>
+                        <div class="medicines-list">
+                            <div class="medicine-item">
+                                <div class="medicine-info">
+                                    <div class="medicine-name">Aspirin</div>
+                                    <div class="medicine-details">325mg • Qty: 6 tablets</div>
+                                </div>
+                            </div>
+                            <div class="medicine-item">
+                                <div class="medicine-info">
+                                    <div class="medicine-name">Sumatriptan</div>
+                                    <div class="medicine-details">50mg • Qty: 4 tablets</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Current template medicines
+    let currentMedicines = [];
+
+    // DOM elements
+    const templateNameInput = document.getElementById('templateName');
+    const advisedSelect = document.getElementById('advised');
+    const medicineNameSelect = document.getElementById('medicineName');
+    const medicineDoseSelect = document.getElementById('medicineDose');
+    const medicineQtyInput = document.getElementById('medicineQty');
+    const addMedicineBtn = document.getElementById('addMedicine');
+    const medicineList = document.getElementById('medicineList');
+    const saveTemplateBtn = document.getElementById('saveTemplate');
+    const emptyMedicineList = document.getElementById('emptyMedicineList');
+    const templateCards = document.querySelectorAll('.template-card');
+
+    // Add medicine to current list
+    addMedicineBtn.addEventListener('click', function() {
+        const name = medicineNameSelect.value;
+        const dose = medicineDoseSelect.value;
+        const quantity = medicineQtyInput.value;
+
+        if (!name || !dose || !quantity) {
+            alert("Please fill all medicine fields");
+            return;
+        }
+
+        // Add to current medicines
+        currentMedicines.push({
+            name: name,
+            dose: dose,
+            quantity: quantity
+        });
+
+        // Update UI
+        renderMedicineList();
+
+        // Reset form
+        medicineNameSelect.value = '';
+        medicineDoseSelect.value = '';
+        medicineQtyInput.value = '';
+    });
+
+    // Render medicine list
+    function renderMedicineList() {
+        if (currentMedicines.length === 0) {
+            medicineList.innerHTML = `
+                <div class="empty-state" id="emptyMedicineList">
+                    <i class="fas fa-pills"></i>
+                    <p>No medicines added yet</p>
+                </div>
+            `;
+            return;
+        }
+
+        emptyMedicineList.style.display = 'none';
+
+        let medicinesHTML = '';
+        currentMedicines.forEach((medicine, index) => {
+            medicinesHTML += `
+                <div class="medicine-item">
+                    <div class="medicine-info">
+                        <div class="medicine-name">${medicine.name}</div>
+                        <div class="medicine-details">${medicine.dose} • Qty: ${medicine.quantity}</div>
+                    </div>
+                    <div class="medicine-actions">
+                        <button class="action-btn" onclick="removeMedicine(${index})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+
+        medicineList.innerHTML = medicinesHTML;
+    }
+
+    // Remove medicine from current list
+    function removeMedicine(index) {
+        currentMedicines.splice(index, 1);
+        renderMedicineList();
+    }
+
+    // Save template
+    saveTemplateBtn.addEventListener('click', function() {
+        const name = templateNameInput.value.trim();
+        const advised = advisedSelect.value;
+
+        if (!name) {
+            alert("Please enter a template name");
+            return;
+        }
+
+        if (!advised) {
+            alert("Please select advised instructions");
+            return;
+        }
+
+        if (currentMedicines.length === 0) {
+            alert("Please add at least one medicine");
+            return;
+        }
+
+        // Reset form
+        templateNameInput.value = '';
+        advisedSelect.value = '';
+        currentMedicines = [];
+        renderMedicineList();
+
+        alert("Template saved successfully!");
+    });
+
+    // Template expand/collapse functionality
+    templateCards.forEach(card => {
+        const header = card.querySelector('.template-header');
+
+        header.addEventListener('click', function(e) {
+            // Don't trigger if clicking on action buttons
+            if (e.target.closest('.template-actions')) {
+                return;
+            }
+
+            // Close all other templates
+            templateCards.forEach(otherCard => {
+                if (otherCard !== card) {
+                    otherCard.classList.remove('expanded');
+                }
+            });
+
+            // Toggle current template
+            card.classList.toggle('expanded');
+        });
+    });
+
+    // Initial render
+    renderMedicineList();
+</script>

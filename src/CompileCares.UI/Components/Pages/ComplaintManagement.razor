@@ -1,0 +1,206 @@
+﻿@page "/complaint"
+<div class="container">
+    <!-- Left Panel - Add Complaint Form -->
+    <div class="left-panel">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Add New Complaint</h3>
+            </div>
+
+            <div class="form-group">
+                <label for="searchComplaint">Search Complaint</label>
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchComplaint" class="search-input" placeholder="Search complaint...">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="complaintName">Complaint Name</label>
+                <input type="text" id="complaintName" placeholder="Enter complaint name">
+            </div>
+
+            <div class="form-group">
+                <button class="btn btn-primary" id="saveComplaint" style="width: 100%;">
+                    <i class="fas fa-save"></i> Save Complaint
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel - Complaint List -->
+    <div class="right-panel">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Complaint List</h3>
+                <button class="btn btn-outline">
+                    <i class="fas fa-filter"></i> Filter
+                </button>
+            </div>
+            <div class="list-container">
+                <div class="item-list" id="complaintList">
+                    <!-- Complaint 1 -->
+                    <div class="item-card">
+                        <div class="item-header">
+                            <div class="item-name">
+                                <i class="fas fa-chevron-right"></i>
+                                Fever
+                            </div>
+                            <div class="item-actions">
+                                <button class="action-btn">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="item-details">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">Created Date</span>
+                                    <span class="detail-value">2024-01-15</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Status</span>
+                                    <span class="detail-value">Active</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Complaint 2 -->
+                    <div class="item-card">
+                        <div class="item-header">
+                            <div class="item-name">
+                                <i class="fas fa-chevron-right"></i>
+                                Headache
+                            </div>
+                            <div class="item-actions">
+                                <button class="action-btn">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="item-details">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">Created Date</span>
+                                    <span class="detail-value">2024-01-10</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Status</span>
+                                    <span class="detail-value">Active</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Complaint 3 -->
+                    <div class="item-card">
+                        <div class="item-header">
+                            <div class="item-name">
+                                <i class="fas fa-chevron-right"></i>
+                                Cough
+                            </div>
+                            <div class="item-actions">
+                                <button class="action-btn">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="item-details">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">Created Date</span>
+                                    <span class="detail-value">2024-01-08</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Status</span>
+                                    <span class="detail-value">Active</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Complaint functionality
+    const searchComplaintInput = document.getElementById('searchComplaint');
+    const complaintNameInput = document.getElementById('complaintName');
+    const saveComplaintBtn = document.getElementById('saveComplaint');
+    const complaintCards = document.querySelectorAll('.item-card');
+
+    saveComplaintBtn.addEventListener('click', function() {
+        const name = complaintNameInput.value.trim();
+
+        if (!name) {
+            alert("Please enter complaint name");
+            return;
+        }
+
+        complaintNameInput.value = '';
+        alert("Complaint saved successfully!");
+    });
+
+    // Search functionality
+    searchComplaintInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+
+        complaintCards.forEach(card => {
+            const complaintName = card.querySelector('.item-name').textContent.toLowerCase();
+
+            if (complaintName.includes(searchTerm)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+
+    // Expand/collapse functionality
+    complaintCards.forEach(card => {
+        const header = card.querySelector('.item-header');
+
+        header.addEventListener('click', function(e) {
+            if (e.target.closest('.item-actions')) return;
+
+            complaintCards.forEach(otherCard => {
+                if (otherCard !== card) otherCard.classList.remove('expanded');
+            });
+
+            card.classList.toggle('expanded');
+        });
+    });
+
+    // Edit/Delete functionality
+    complaintCards.forEach(card => {
+        const editBtn = card.querySelector('.action-btn:first-child');
+        const deleteBtn = card.querySelector('.action-btn:last-child');
+
+        editBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const complaintName = card.querySelector('.item-name').textContent.trim();
+            alert(`Edit complaint: ${complaintName}`);
+        });
+
+        deleteBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const complaintName = card.querySelector('.item-name').textContent.trim();
+            if (confirm(`Delete ${complaintName}?`)) {
+                card.style.display = 'none';
+                alert(`${complaintName} deleted!`);
+            }
+        });
+    });
+</script>

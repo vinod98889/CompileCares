@@ -1,4 +1,6 @@
-﻿namespace CompileCares.Application.Features.Pharmacy.DTOs
+﻿using CompileCares.Shared.Enums;
+
+namespace CompileCares.Application.Features.Pharmacy.DTOs
 {
     public class StockUpdateRequest
     {
@@ -10,13 +12,5 @@
         public string? Supplier { get; set; }
         public string? InvoiceNumber { get; set; }
         public string? Notes { get; set; }
-    }
-
-    public enum StockAction
-    {
-        Add,
-        Remove,
-        Adjust,
-        Return
-    }
+    }        
 }

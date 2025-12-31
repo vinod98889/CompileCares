@@ -47,10 +47,15 @@ namespace CompileCares.Infrastructure.Services
             await _unitOfWork.Repository<Prescription>().AddAsync(prescription);
             await _unitOfWork.SaveChangesAsync();
 
+            // Link prescription to visit
+            visit.LinkPrescription(prescription);
+            await _unitOfWork.Repository<OPDVisit>().UpdateAsync(visit);
+            await _unitOfWork.SaveChangesAsync();
+
             return prescription;
         }
 
-        public async Task<Prescription> AddMedicineToPrescriptionAsync(Guid prescriptionId, Guid medicineId, Guid doseId, int durationDays, int quantity, string? instructions, Guid updatedBy)
+        public async Task<Prescription> AddMedicineToPrescriptionAsync(Guid prescriptionId, Guid medicineId, Guid doseId, int durationDays, int quantity, string? instructions, string? customDosage, Guid updatedBy)
         {
             var prescription = await GetPrescriptionWithMedicinesAsync(prescriptionId);
 
@@ -65,7 +70,7 @@ namespace CompileCares.Infrastructure.Services
                 throw new NotFoundException(nameof(Dose), doseId);
 
             // Add medicine to prescription
-            prescription.AddMedicine(medicine, dose, durationDays, quantity, instructions, null, updatedBy);
+            prescription.AddMedicine(medicineId, doseId, durationDays, quantity, instructions, customDosage, updatedBy);
 
             await _unitOfWork.Repository<Prescription>().UpdateAsync(prescription);
             await _unitOfWork.SaveChangesAsync();
@@ -94,7 +99,7 @@ namespace CompileCares.Infrastructure.Services
                 throw new NotFoundException(nameof(PrescriptionTemplate), templateId);
 
             // Check if doctor can use this template
-            if (!template.CanBeUsedBy(prescription.DoctorId))
+            if (!template.IsPublic && template.DoctorId != prescription.DoctorId)
                 throw new ValidationException($"Doctor does not have access to template '{template.Name}'");
 
             // Apply template to prescription
@@ -118,7 +123,7 @@ namespace CompileCares.Infrastructure.Services
             var outOfStockMedicines = new List<string>();
             foreach (var medicine in prescription.Medicines)
             {
-                if (medicine.Medicine != null && medicine.Medicine.CurrentStock < medicine.Quantity)
+                if (medicine.Medicine != null && medicine.Medicine.CurrentStock < medicine.CalculateTotalUnits())
                 {
                     outOfStockMedicines.Add(medicine.Medicine.Name);
                 }
@@ -150,6 +155,8 @@ namespace CompileCares.Infrastructure.Services
                 .GetQueryable()
                 .Where(p => p.PatientId == patientId && !p.IsDeleted)
                 .Include(p => p.Doctor)
+                .Include(p => p.Patient)
+                .Include(p => p.OPDVisit)
                 .Include(p => p.Medicines)
                     .ThenInclude(m => m.Medicine)
                 .Include(p => p.Medicines)
@@ -166,24 +173,16 @@ namespace CompileCares.Infrastructure.Services
 
         public async Task<bool> ValidatePrescriptionAsync(Guid prescriptionId)
         {
-            var prescription = await _unitOfWork.Repository<Prescription>().GetByIdAsync(prescriptionId);
-            if (prescription == null)
-                throw new NotFoundException(nameof(Prescription), prescriptionId);
+            var prescription = await GetPrescriptionWithAllDetailsAsync(prescriptionId);
 
             // Check if prescription is valid
             if (!prescription.IsValid())
                 return false;
 
             // Check if all required medicines are in stock
-            var medicines = await _unitOfWork.Repository<PrescriptionMedicine>()
-                .GetQueryable()
-                .Where(pm => pm.PrescriptionId == prescriptionId)
-                .Include(pm => pm.Medicine)
-                .ToListAsync();
-
-            foreach (var medicine in medicines)
+            foreach (var medicine in prescription.Medicines)
             {
-                if (medicine.Medicine != null && medicine.Medicine.CurrentStock < medicine.Quantity)
+                if (medicine.Medicine != null && medicine.Medicine.CurrentStock < medicine.CalculateTotalUnits())
                 {
                     return false;
                 }
@@ -353,54 +352,14 @@ namespace CompileCares.Infrastructure.Services
             return sb.ToString();
         }
 
-        // Helper Methods
-        private async Task<Prescription> GetPrescriptionWithMedicinesAsync(Guid prescriptionId)
+        public async Task<Prescription> GetPrescriptionWithDetailsAsync(Guid prescriptionId)
         {
-            var prescription = await _unitOfWork.Repository<Prescription>()
-                .GetQueryable()
-                .Where(p => p.Id == prescriptionId && !p.IsDeleted)
-                .Include(p => p.Medicines)
-                    .ThenInclude(m => m.Medicine)
-                .Include(p => p.Medicines)
-                    .ThenInclude(m => m.Dose)
-                .FirstOrDefaultAsync();
-
-            if (prescription == null)
-                throw new NotFoundException(nameof(Prescription), prescriptionId);
-
-            return prescription;
+            return await GetPrescriptionWithAllDetailsAsync(prescriptionId);
         }
-
-        private async Task<Prescription> GetPrescriptionWithAllDetailsAsync(Guid prescriptionId)
-        {
-            var prescription = await _unitOfWork.Repository<Prescription>()
-                .GetQueryable()
-                .Where(p => p.Id == prescriptionId && !p.IsDeleted)
-                .Include(p => p.Patient)
-                .Include(p => p.Doctor)
-                .Include(p => p.OPDVisit)
-                .Include(p => p.Medicines)
-                    .ThenInclude(m => m.Medicine)
-                .Include(p => p.Medicines)
-                    .ThenInclude(m => m.Dose)
-                .Include(p => p.Complaints)
-                    .ThenInclude(c => c.Complaint)
-                .Include(p => p.AdvisedItems)
-                    .ThenInclude(a => a.Advised)
-                .FirstOrDefaultAsync();
-
-            if (prescription == null)
-                throw new NotFoundException(nameof(Prescription), prescriptionId);
-
-            return prescription;
-        }
-
-        // Additional Methods for Enhanced Functionality
 
         public async Task<PrescriptionDetailDto> GetPrescriptionDetailAsync(Guid prescriptionId)
         {
             var prescription = await GetPrescriptionWithAllDetailsAsync(prescriptionId);
-
             return MapToPrescriptionDetailDto(prescription);
         }
 
@@ -468,6 +427,10 @@ namespace CompileCares.Infrastructure.Services
             var prescriptions = await query
                 .Include(p => p.Patient)
                 .Include(p => p.Doctor)
+                .Include(p => p.OPDVisit)
+                .Include(p => p.Medicines)
+                .Include(p => p.Complaints)
+                .Include(p => p.AdvisedItems)
                 .Skip((request.PageNumber - 1) * request.PageSize)
                 .Take(request.PageSize)
                 .ToListAsync();
@@ -551,6 +514,55 @@ namespace CompileCares.Infrastructure.Services
             return true;
         }
 
+        public async Task<Prescription> UpdatePrescriptionAsync(Prescription prescription)
+        {
+            await _unitOfWork.Repository<Prescription>().UpdateAsync(prescription);
+            await _unitOfWork.SaveChangesAsync();
+            return prescription;
+        }
+
+        // Helper Methods
+        private async Task<Prescription> GetPrescriptionWithMedicinesAsync(Guid prescriptionId)
+        {
+            var prescription = await _unitOfWork.Repository<Prescription>()
+                .GetQueryable()
+                .Where(p => p.Id == prescriptionId && !p.IsDeleted)
+                .Include(p => p.Medicines)
+                    .ThenInclude(m => m.Medicine)
+                .Include(p => p.Medicines)
+                    .ThenInclude(m => m.Dose)
+                .FirstOrDefaultAsync();
+
+            if (prescription == null)
+                throw new NotFoundException(nameof(Prescription), prescriptionId);
+
+            return prescription;
+        }
+
+        private async Task<Prescription> GetPrescriptionWithAllDetailsAsync(Guid prescriptionId)
+        {
+            var prescription = await _unitOfWork.Repository<Prescription>()
+                .GetQueryable()
+                .Where(p => p.Id == prescriptionId && !p.IsDeleted)
+                .Include(p => p.Patient)
+                .Include(p => p.Doctor)
+                .Include(p => p.OPDVisit)
+                .Include(p => p.Medicines)
+                    .ThenInclude(m => m.Medicine)
+                .Include(p => p.Medicines)
+                    .ThenInclude(m => m.Dose)
+                .Include(p => p.Complaints)
+                    .ThenInclude(c => c.Complaint)
+                .Include(p => p.AdvisedItems)
+                    .ThenInclude(a => a.Advised)
+                .FirstOrDefaultAsync();
+
+            if (prescription == null)
+                throw new NotFoundException(nameof(Prescription), prescriptionId);
+
+            return prescription;
+        }
+
         // Mapping Methods
         private PrescriptionDto MapToPrescriptionDto(Prescription prescription)
         {
@@ -610,9 +622,9 @@ namespace CompileCares.Infrastructure.Services
                 CreatedAt = prescription.CreatedAt,
                 UpdatedAt = prescription.UpdatedAt,
                 DoctorSignaturePath = prescription.Doctor?.SignaturePath,
-                DoctorDigitalSignature = prescription.Doctor?.SignaturePath, // Assuming this is the same for now
-                IsDispensed = prescription.Medicines.All(m => m.IsDispensed),
-                DispensedDate = prescription.Medicines.Max(m => m.DispensedDate),
+                DoctorDigitalSignature = prescription.Doctor?.SignaturePath,
+                IsDispensed = prescription.Medicines.Any() && prescription.Medicines.All(m => m.IsDispensed),
+                DispensedDate = prescription.Medicines.Any() ? prescription.Medicines.Max(m => m.DispensedDate) : null,
                 DispensedBy = prescription.Medicines.FirstOrDefault(m => m.IsDispensed)?.DispensedBy
             };
 

@@ -1,7 +1,11 @@
 ﻿using CompileCares.API.Models.Responses;
+using CompileCares.Application.Common.Exceptions;
 using CompileCares.Application.Features.Prescriptions.DTOs;
 using CompileCares.Application.Services;
+using CompileCares.Core.Entities.Clinical;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
+using System.Net;
 
 namespace CompileCares.API.Controllers
 {
@@ -22,8 +26,8 @@ namespace CompileCares.API.Controllers
 
         // POST: api/prescriptions
         [HttpPost]
-        [ProducesResponseType(typeof(ApiResponse<PrescriptionDto>), StatusCodes.Status201Created)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<PrescriptionDetailDto>), (int)HttpStatusCode.Created)]
+        [ProducesResponseType(typeof(ApiResponse), (int)HttpStatusCode.BadRequest)]
         public async Task<IActionResult> CreatePrescription(
             [FromBody] CreatePrescriptionRequest request,
             [FromHeader(Name = "X-User-Id")] Guid? userId = null)
@@ -32,44 +36,32 @@ namespace CompileCares.API.Controllers
             {
                 if (!ModelState.IsValid)
                 {
-                    var errors = ModelState.Values
-                        .SelectMany(v => v.Errors)
-                        .Select(e => e.ErrorMessage)
-                        .ToList();
-
-                    return BadRequest(ApiResponse.ErrorResponse("Validation failed", errors));
+                    return BadRequest(ApiResponse.ErrorResponse("Invalid request data"));
                 }
 
-                var createdBy = userId ?? GetCurrentUserId();
-                if (createdBy == Guid.Empty)
-                {
-                    return Unauthorized(ApiResponse.ErrorResponse("User not authenticated"));
-                }
+                var createdBy = GetCurrentUserId(userId);
 
                 _logger.LogInformation("Creating prescription for patient: {PatientId}", request.PatientId);
 
-                // First create the prescription
+                // Create prescription
                 var prescription = await _prescriptionService.CreatePrescriptionAsync(
                     request.PatientId,
                     request.DoctorId,
                     request.OPDVisitId,
                     createdBy);
 
-                // Update diagnosis and instructions if provided
+                // Update diagnosis if provided
                 if (!string.IsNullOrWhiteSpace(request.Diagnosis))
                 {
-                    prescription.UpdateDiagnosis(request.Diagnosis, createdBy);
+                    await _prescriptionService.UpdatePrescriptionDiagnosisAsync(
+                        prescription.Id, request.Diagnosis, createdBy);
                 }
 
+                // Update instructions if provided
                 if (!string.IsNullOrWhiteSpace(request.Instructions))
                 {
-                    prescription.UpdateInstructions(request.Instructions, createdBy);
-                }
-
-                if (!string.IsNullOrWhiteSpace(request.FollowUpInstructions))
-                {
-                    // Note: Need to add SetFollowUpInstructions method to Prescription entity
-                    // prescription.SetFollowUpInstructions(request.FollowUpInstructions, createdBy);
+                    await _prescriptionService.UpdatePrescriptionInstructionsAsync(
+                        prescription.Id, request.Instructions, createdBy);
                 }
 
                 // Add medicines
@@ -82,48 +74,67 @@ namespace CompileCares.API.Controllers
                         medicineRequest.DurationDays,
                         medicineRequest.Quantity,
                         medicineRequest.Instructions,
+                        medicineRequest.CustomDosage,
                         createdBy);
                 }
 
                 // Add complaints
                 foreach (var complaintRequest in request.Complaints)
                 {
-                    // Note: Need to add AddComplaintToPrescriptionAsync method to service
-                    // await _prescriptionService.AddComplaintToPrescriptionAsync(
-                    //     prescription.Id,
-                    //     complaintRequest.ComplaintId,
-                    //     complaintRequest.CustomComplaint,
-                    //     complaintRequest.Duration,
-                    //     complaintRequest.Severity,
-                    //     createdBy);
+                    await _prescriptionService.AddComplaintToPrescriptionAsync(
+                        prescription.Id,
+                        complaintRequest.ComplaintId,
+                        complaintRequest.CustomComplaint,
+                        complaintRequest.Duration,
+                        complaintRequest.Severity,
+                        createdBy);
                 }
 
                 // Add advised items
                 foreach (var advisedRequest in request.AdvisedItems)
                 {
-                    // Note: Need to add AddAdviceToPrescriptionAsync method to service
-                    // await _prescriptionService.AddAdviceToPrescriptionAsync(
-                    //     prescription.Id,
-                    //     advisedRequest.AdvisedId,
-                    //     advisedRequest.CustomAdvice,
-                    //     createdBy);
+                    await _prescriptionService.AddAdviceToPrescriptionAsync(
+                        prescription.Id,
+                        advisedRequest.AdvisedId,
+                        advisedRequest.CustomAdvice,
+                        createdBy);
                 }
 
                 // Set validity if different from default
                 if (request.ValidityDays != 7)
                 {
-                    prescription.SetValidity(request.ValidityDays, createdBy);
+                    // Get prescription and set validity
+                    var prescriptionToUpdate = await _prescriptionService.GetPrescriptionWithDetailsAsync(prescription.Id);
+                    prescriptionToUpdate.SetValidity(request.ValidityDays, createdBy);
                 }
 
-                // Get updated prescription with all details
-                var updatedPrescription = await GetPrescriptionWithDetails(prescription.Id);
+                // Complete the prescription
+                await _prescriptionService.CompletePrescriptionAsync(prescription.Id, createdBy);
+
+                // Get complete prescription with details
+                var prescriptionDetail = await _prescriptionService.GetPrescriptionDetailAsync(prescription.Id);
 
                 return CreatedAtAction(
                     nameof(GetPrescription),
                     new { id = prescription.Id },
-                    ApiResponse<PrescriptionDto>.SuccessResponse(
-                        MapToPrescriptionDto(updatedPrescription),
+                    ApiResponse<PrescriptionDetailDto>.SuccessResponse(
+                        prescriptionDetail,
                         "Prescription created successfully"));
+            }
+            catch (NotFoundException ex)
+            {
+                _logger.LogWarning(ex, "Resource not found while creating prescription");
+                return NotFound(ApiResponse.ErrorResponse(ex.Message));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Validation error creating prescription");
+                return BadRequest(ApiResponse.ErrorResponse(ex.Message));
+            }
+            catch (ValidationException ex)
+            {
+                _logger.LogWarning(ex, "Business validation error creating prescription");
+                return BadRequest(ApiResponse.ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
@@ -134,21 +145,21 @@ namespace CompileCares.API.Controllers
 
         // GET: api/prescriptions/{id}
         [HttpGet("{id}")]
-        [ProducesResponseType(typeof(ApiResponse<PrescriptionDetailDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<PrescriptionDetailDto>), (int)HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(ApiResponse), (int)HttpStatusCode.NotFound)]
         public async Task<IActionResult> GetPrescription(Guid id)
         {
             try
             {
                 _logger.LogInformation("Getting prescription with ID: {PrescriptionId}", id);
 
-                var prescription = await GetPrescriptionWithDetails(id);
+                var prescriptionDetail = await _prescriptionService.GetPrescriptionDetailAsync(id);
 
                 return Ok(ApiResponse<PrescriptionDetailDto>.SuccessResponse(
-                    MapToPrescriptionDetailDto(prescription),
+                    prescriptionDetail,
                     "Prescription retrieved successfully"));
             }
-            catch (Application.Common.Exceptions.NotFoundException ex)
+            catch (NotFoundException ex)
             {
                 _logger.LogWarning(ex, "Prescription not found with ID: {PrescriptionId}", id);
                 return NotFound(ApiResponse.ErrorResponse("Prescription not found"));
@@ -162,8 +173,8 @@ namespace CompileCares.API.Controllers
 
         // POST: api/prescriptions/{id}/medicines
         [HttpPost("{id}/medicines")]
-        [ProducesResponseType(typeof(ApiResponse<PrescriptionDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<PrescriptionDetailDto>), (int)HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(ApiResponse), (int)HttpStatusCode.NotFound)]
         public async Task<IActionResult> AddMedicine(
             Guid id,
             [FromBody] AddMedicineRequest request,
@@ -173,19 +184,10 @@ namespace CompileCares.API.Controllers
             {
                 if (!ModelState.IsValid)
                 {
-                    var errors = ModelState.Values
-                        .SelectMany(v => v.Errors)
-                        .Select(e => e.ErrorMessage)
-                        .ToList();
-
-                    return BadRequest(ApiResponse.ErrorResponse("Validation failed", errors));
+                    return BadRequest(ApiResponse.ErrorResponse("Invalid request data"));
                 }
 
-                var updatedBy = userId ?? GetCurrentUserId();
-                if (updatedBy == Guid.Empty)
-                {
-                    return Unauthorized(ApiResponse.ErrorResponse("User not authenticated"));
-                }
+                var updatedBy = GetCurrentUserId(userId);
 
                 _logger.LogInformation("Adding medicine to prescription: {PrescriptionId}", id);
 
@@ -196,16 +198,24 @@ namespace CompileCares.API.Controllers
                     request.DurationDays,
                     request.Quantity,
                     request.Instructions,
+                    request.CustomDosage,
                     updatedBy);
 
-                return Ok(ApiResponse<PrescriptionDto>.SuccessResponse(
-                    MapToPrescriptionDto(prescription),
+                var prescriptionDetail = await _prescriptionService.GetPrescriptionDetailAsync(id);
+
+                return Ok(ApiResponse<PrescriptionDetailDto>.SuccessResponse(
+                    prescriptionDetail,
                     "Medicine added successfully"));
             }
-            catch (Application.Common.Exceptions.NotFoundException ex)
+            catch (NotFoundException ex)
             {
                 _logger.LogWarning(ex, "Prescription not found with ID: {PrescriptionId}", id);
                 return NotFound(ApiResponse.ErrorResponse("Prescription not found"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Validation error adding medicine to prescription");
+                return BadRequest(ApiResponse.ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
@@ -216,8 +226,8 @@ namespace CompileCares.API.Controllers
 
         // POST: api/prescriptions/{id}/apply-template
         [HttpPost("{id}/apply-template")]
-        [ProducesResponseType(typeof(ApiResponse<PrescriptionDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<PrescriptionDetailDto>), (int)HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(ApiResponse), (int)HttpStatusCode.NotFound)]
         public async Task<IActionResult> ApplyTemplate(
             Guid id,
             [FromBody] ApplyTemplateRequest request,
@@ -227,19 +237,10 @@ namespace CompileCares.API.Controllers
             {
                 if (!ModelState.IsValid)
                 {
-                    var errors = ModelState.Values
-                        .SelectMany(v => v.Errors)
-                        .Select(e => e.ErrorMessage)
-                        .ToList();
-
-                    return BadRequest(ApiResponse.ErrorResponse("Validation failed", errors));
+                    return BadRequest(ApiResponse.ErrorResponse("Invalid request data"));
                 }
 
-                var appliedBy = userId ?? GetCurrentUserId();
-                if (appliedBy == Guid.Empty)
-                {
-                    return Unauthorized(ApiResponse.ErrorResponse("User not authenticated"));
-                }
+                var appliedBy = GetCurrentUserId(userId);
 
                 _logger.LogInformation("Applying template to prescription: {PrescriptionId}", id);
 
@@ -248,14 +249,21 @@ namespace CompileCares.API.Controllers
                     request.TemplateId,
                     appliedBy);
 
-                return Ok(ApiResponse<PrescriptionDto>.SuccessResponse(
-                    MapToPrescriptionDto(prescription),
+                var prescriptionDetail = await _prescriptionService.GetPrescriptionDetailAsync(id);
+
+                return Ok(ApiResponse<PrescriptionDetailDto>.SuccessResponse(
+                    prescriptionDetail,
                     "Template applied successfully"));
             }
-            catch (Application.Common.Exceptions.NotFoundException ex)
+            catch (NotFoundException ex)
             {
                 _logger.LogWarning(ex, "Prescription or template not found");
                 return NotFound(ApiResponse.ErrorResponse("Prescription or template not found"));
+            }
+            catch (ValidationException ex)
+            {
+                _logger.LogWarning(ex, "Validation error applying template");
+                return BadRequest(ApiResponse.ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
@@ -266,39 +274,41 @@ namespace CompileCares.API.Controllers
 
         // POST: api/prescriptions/{id}/complete
         [HttpPost("{id}/complete")]
-        [ProducesResponseType(typeof(ApiResponse<PrescriptionDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<PrescriptionDetailDto>), (int)HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(ApiResponse), (int)HttpStatusCode.NotFound)]
+        [ProducesResponseType(typeof(ApiResponse), (int)HttpStatusCode.BadRequest)]
         public async Task<IActionResult> CompletePrescription(
             Guid id,
             [FromHeader(Name = "X-User-Id")] Guid? userId = null)
         {
             try
             {
-                var completedBy = userId ?? GetCurrentUserId();
-                if (completedBy == Guid.Empty)
-                {
-                    return Unauthorized(ApiResponse.ErrorResponse("User not authenticated"));
-                }
+                var completedBy = GetCurrentUserId(userId);
 
                 _logger.LogInformation("Completing prescription: {PrescriptionId}", id);
 
                 var prescription = await _prescriptionService.CompletePrescriptionAsync(id, completedBy);
+                var prescriptionDetail = await _prescriptionService.GetPrescriptionDetailAsync(id);
 
-                return Ok(ApiResponse<PrescriptionDto>.SuccessResponse(
-                    MapToPrescriptionDto(prescription),
+                return Ok(ApiResponse<PrescriptionDetailDto>.SuccessResponse(
+                    prescriptionDetail,
                     "Prescription completed successfully"));
             }
-            catch (Application.Common.Exceptions.NotFoundException ex)
+            catch (NotFoundException ex)
             {
                 _logger.LogWarning(ex, "Prescription not found with ID: {PrescriptionId}", id);
                 return NotFound(ApiResponse.ErrorResponse("Prescription not found"));
             }
-            //catch (Application.Common.Exceptions.ValidationException ex)
-            //{
-            //    _logger.LogWarning(ex, "Validation failed for completing prescription: {PrescriptionId}", id);
-            //    return BadRequest(ApiResponse.ErrorResponse(ex.Message));
-            //}
+            catch (ValidationException ex)
+            {
+                _logger.LogWarning(ex, "Validation error completing prescription: {PrescriptionId}", id);
+                return BadRequest(ApiResponse.ErrorResponse(ex.Message));
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Cannot complete prescription from current state");
+                return BadRequest(ApiResponse.ErrorResponse(ex.Message));
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error completing prescription: {PrescriptionId}", id);
@@ -308,7 +318,7 @@ namespace CompileCares.API.Controllers
 
         // GET: api/prescriptions/patient/{patientId}
         [HttpGet("patient/{patientId}")]
-        [ProducesResponseType(typeof(ApiResponse<List<PrescriptionDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<List<PrescriptionDto>>), (int)HttpStatusCode.OK)]
         public async Task<IActionResult> GetPatientPrescriptions(Guid patientId)
         {
             try
@@ -316,10 +326,47 @@ namespace CompileCares.API.Controllers
                 _logger.LogInformation("Getting prescriptions for patient: {PatientId}", patientId);
 
                 var prescriptions = await _prescriptionService.GetPatientPrescriptionsAsync(patientId);
+                var prescriptionDtos = new List<PrescriptionDto>();
+
+                foreach (var prescription in prescriptions)
+                {
+                    var dto = await _prescriptionService.GetPrescriptionDetailAsync(prescription.Id);
+                    prescriptionDtos.Add(new PrescriptionDto
+                    {
+                        Id = dto.Id,
+                        PrescriptionNumber = dto.PrescriptionNumber,
+                        PrescriptionDate = dto.PrescriptionDate,
+                        PatientId = dto.PatientId,
+                        PatientName = dto.PatientName,
+                        PatientNumber = dto.PatientNumber,
+                        DoctorId = dto.DoctorId,
+                        DoctorName = dto.DoctorName,
+                        DoctorRegistrationNumber = dto.DoctorRegistrationNumber,
+                        OPDVisitId = dto.OPDVisitId,
+                        VisitNumber = dto.VisitNumber,
+                        Diagnosis = dto.Diagnosis,
+                        Instructions = dto.Instructions,
+                        FollowUpInstructions = dto.FollowUpInstructions,
+                        Status = dto.Status,
+                        ValidityDays = dto.ValidityDays,
+                        ValidUntil = dto.ValidUntil,
+                        IsValid = dto.IsValid,
+                        MedicineCount = dto.Medicines.Count,
+                        ComplaintCount = dto.Complaints.Count,
+                        AdviceCount = dto.AdvisedItems.Count,
+                        CreatedAt = dto.CreatedAt,
+                        UpdatedAt = dto.UpdatedAt
+                    });
+                }
 
                 return Ok(ApiResponse<List<PrescriptionDto>>.SuccessResponse(
-                    prescriptions.Select(MapToPrescriptionDto).ToList(),
+                    prescriptionDtos,
                     "Patient prescriptions retrieved successfully"));
+            }
+            catch (NotFoundException ex)
+            {
+                _logger.LogWarning(ex, "Patient not found: {PatientId}", patientId);
+                return NotFound(ApiResponse.ErrorResponse("Patient not found"));
             }
             catch (Exception ex)
             {
@@ -330,8 +377,8 @@ namespace CompileCares.API.Controllers
 
         // GET: api/prescriptions/{id}/validate
         [HttpGet("{id}/validate")]
-        [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<bool>), (int)HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(ApiResponse), (int)HttpStatusCode.NotFound)]
         public async Task<IActionResult> ValidatePrescription(Guid id)
         {
             try
@@ -344,7 +391,7 @@ namespace CompileCares.API.Controllers
                     isValid,
                     isValid ? "Prescription is valid" : "Prescription is invalid"));
             }
-            catch (Application.Common.Exceptions.NotFoundException ex)
+            catch (NotFoundException ex)
             {
                 _logger.LogWarning(ex, "Prescription not found with ID: {PrescriptionId}", id);
                 return NotFound(ApiResponse.ErrorResponse("Prescription not found"));
@@ -358,8 +405,8 @@ namespace CompileCares.API.Controllers
 
         // GET: api/prescriptions/{id}/print
         [HttpGet("{id}/print")]
-        [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<string>), (int)HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(ApiResponse), (int)HttpStatusCode.NotFound)]
         public async Task<IActionResult> PrintPrescription(Guid id)
         {
             try
@@ -372,7 +419,7 @@ namespace CompileCares.API.Controllers
                     printContent,
                     "Prescription print generated successfully"));
             }
-            catch (Application.Common.Exceptions.NotFoundException ex)
+            catch (NotFoundException ex)
             {
                 _logger.LogWarning(ex, "Prescription not found with ID: {PrescriptionId}", id);
                 return NotFound(ApiResponse.ErrorResponse("Prescription not found"));
@@ -384,10 +431,11 @@ namespace CompileCares.API.Controllers
             }
         }
 
-        // DELETE: api/prescriptions/{id}/cancel
-        [HttpDelete("{id}/cancel")]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        // DELETE: api/prescriptions/{id}
+        [HttpDelete("{id}")]
+        [ProducesResponseType(typeof(ApiResponse), (int)HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(ApiResponse), (int)HttpStatusCode.NotFound)]
+        [ProducesResponseType(typeof(ApiResponse), (int)HttpStatusCode.BadRequest)]
         public async Task<IActionResult> CancelPrescription(
             Guid id,
             [FromQuery] string reason,
@@ -400,25 +448,23 @@ namespace CompileCares.API.Controllers
                     return BadRequest(ApiResponse.ErrorResponse("Cancellation reason is required"));
                 }
 
-                var cancelledBy = userId ?? GetCurrentUserId();
-                if (cancelledBy == Guid.Empty)
-                {
-                    return Unauthorized(ApiResponse.ErrorResponse("User not authenticated"));
-                }
+                var cancelledBy = GetCurrentUserId(userId);
 
                 _logger.LogInformation("Cancelling prescription: {PrescriptionId}", id);
 
-                // Note: Need to add CancelPrescriptionAsync method to service
-                // var success = await _prescriptionService.CancelPrescriptionAsync(id, reason, cancelledBy);
+                var success = await _prescriptionService.CancelPrescriptionAsync(id, reason, cancelledBy);
 
-                // return Ok(ApiResponse.SuccessResponse("Prescription cancelled successfully"));
-
-                return Ok(ApiResponse.SuccessResponse("Cancellation endpoint ready - implementation pending"));
+                return Ok(ApiResponse.SuccessResponse("Prescription cancelled successfully"));
             }
-            catch (Application.Common.Exceptions.NotFoundException ex)
+            catch (NotFoundException ex)
             {
                 _logger.LogWarning(ex, "Prescription not found with ID: {PrescriptionId}", id);
                 return NotFound(ApiResponse.ErrorResponse("Prescription not found"));
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Validation error cancelling prescription");
+                return BadRequest(ApiResponse.ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
@@ -429,23 +475,21 @@ namespace CompileCares.API.Controllers
 
         // GET: api/prescriptions/search
         [HttpGet("search")]
-        [ProducesResponseType(typeof(ApiResponse<List<PrescriptionDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<List<PrescriptionDto>>), (int)HttpStatusCode.OK)]
         public async Task<IActionResult> SearchPrescriptions([FromQuery] PrescriptionSearchRequest request)
         {
             try
             {
                 _logger.LogInformation("Searching prescriptions with filters");
 
-                // Note: Need to add SearchPrescriptionsAsync method to service
-                // var prescriptions = await _prescriptionService.SearchPrescriptionsAsync(request);
+                var prescriptionDtos = await _prescriptionService.SearchPrescriptionsAsync(request);
 
-                // return Ok(ApiResponse<List<PrescriptionDto>>.SuccessResponse(
-                //     prescriptions.Select(MapToPrescriptionDto).ToList(),
-                //     "Prescriptions retrieved successfully"));
+                // prescriptionDtos is already a list of PrescriptionDto, no need to map again
+                var prescriptionsList = prescriptionDtos.ToList();
 
                 return Ok(ApiResponse<List<PrescriptionDto>>.SuccessResponse(
-                    new List<PrescriptionDto>(),
-                    "Search endpoint ready - implementation pending"));
+                    prescriptionsList,
+                    "Prescriptions retrieved successfully"));
             }
             catch (Exception ex)
             {
@@ -456,8 +500,9 @@ namespace CompileCares.API.Controllers
 
         // POST: api/prescriptions/{prescriptionId}/medicines/{medicineId}/dispense
         [HttpPost("{prescriptionId}/medicines/{medicineId}/dispense")]
-        [ProducesResponseType(typeof(ApiResponse<PrescriptionDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<PrescriptionDetailDto>), (int)HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(ApiResponse), (int)HttpStatusCode.NotFound)]
+        [ProducesResponseType(typeof(ApiResponse), (int)HttpStatusCode.BadRequest)]
         public async Task<IActionResult> DispenseMedicine(
             Guid prescriptionId,
             Guid medicineId,
@@ -471,31 +516,29 @@ namespace CompileCares.API.Controllers
                     return BadRequest(ApiResponse.ErrorResponse("Dispenser name is required"));
                 }
 
-                var updatedBy = userId ?? GetCurrentUserId();
-                if (updatedBy == Guid.Empty)
-                {
-                    return Unauthorized(ApiResponse.ErrorResponse("User not authenticated"));
-                }
+                var updatedBy = GetCurrentUserId(userId);
 
                 _logger.LogInformation("Dispensing medicine {MedicineId} from prescription {PrescriptionId}",
                     medicineId, prescriptionId);
 
-                // Note: Need to add MarkMedicineAsDispensedAsync method to service
-                // var prescription = await _prescriptionService.MarkMedicineAsDispensedAsync(
-                //     prescriptionId, medicineId, dispensedBy, updatedBy);
+                var prescription = await _prescriptionService.MarkMedicineAsDispensedAsync(
+                    prescriptionId, medicineId, dispensedBy, updatedBy);
 
-                // return Ok(ApiResponse<PrescriptionDto>.SuccessResponse(
-                //     MapToPrescriptionDto(prescription),
-                //     "Medicine dispensed successfully"));
+                var prescriptionDetail = await _prescriptionService.GetPrescriptionDetailAsync(prescriptionId);
 
-                return Ok(ApiResponse<PrescriptionDto>.SuccessResponse(
-                    new PrescriptionDto(),
-                    "Dispense endpoint ready - implementation pending"));
+                return Ok(ApiResponse<PrescriptionDetailDto>.SuccessResponse(
+                    prescriptionDetail,
+                    "Medicine dispensed successfully"));
             }
-            catch (Application.Common.Exceptions.NotFoundException ex)
+            catch (NotFoundException ex)
             {
                 _logger.LogWarning(ex, "Prescription or medicine not found");
                 return NotFound(ApiResponse.ErrorResponse("Prescription or medicine not found"));
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Cannot dispense medicine");
+                return BadRequest(ApiResponse.ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
@@ -505,73 +548,68 @@ namespace CompileCares.API.Controllers
             }
         }
 
+        // DELETE: api/prescriptions/{prescriptionId}/medicines/{medicineId}
+        [HttpDelete("{prescriptionId}/medicines/{medicineId}")]
+        [ProducesResponseType(typeof(ApiResponse<PrescriptionDetailDto>), (int)HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(ApiResponse), (int)HttpStatusCode.NotFound)]
+        public async Task<IActionResult> RemoveMedicine(
+            Guid prescriptionId,
+            Guid medicineId,
+            [FromHeader(Name = "X-User-Id")] Guid? userId = null)
+        {
+            try
+            {
+                var removedBy = GetCurrentUserId(userId);
+
+                _logger.LogInformation("Removing medicine {MedicineId} from prescription {PrescriptionId}",
+                    medicineId, prescriptionId);
+
+                // Get prescription with details
+                var prescription = await _prescriptionService.GetPrescriptionWithDetailsAsync(prescriptionId);
+
+                // Remove medicine
+                prescription.RemoveMedicine(medicineId, removedBy);
+
+                // Update prescription in database
+                // Note: You'll need to implement this update method in your service or repository
+                await _prescriptionService.UpdatePrescriptionAsync(prescription);
+
+                var prescriptionDetail = await _prescriptionService.GetPrescriptionDetailAsync(prescriptionId);
+
+                return Ok(ApiResponse<PrescriptionDetailDto>.SuccessResponse(
+                    prescriptionDetail,
+                    "Medicine removed successfully"));
+            }
+            catch (NotFoundException ex)
+            {
+                _logger.LogWarning(ex, "Prescription or medicine not found");
+                return NotFound(ApiResponse.ErrorResponse("Prescription or medicine not found"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error removing medicine {MedicineId} from prescription {PrescriptionId}",
+                    medicineId, prescriptionId);
+                return StatusCode(500, ApiResponse.ErrorResponse("An error occurred while removing medicine"));
+            }
+        }
+
         // Helper Methods
-        private async Task<Core.Entities.Clinical.Prescription> GetPrescriptionWithDetails(Guid id)
+        private Guid GetCurrentUserId(Guid? userId = null)
         {
-            // This is a placeholder - you need to implement this in your service layer
-            // or create a repository method to get prescription with all includes
-            throw new NotImplementedException("Implement GetPrescriptionWithDetails in service layer");
-        }
+            // Use provided userId or get from header
+            if (userId.HasValue && userId.Value != Guid.Empty)
+                return userId.Value;
 
-        private PrescriptionDto MapToPrescriptionDto(Core.Entities.Clinical.Prescription prescription)
-        {
-            // Map entity to DTO - you should use AutoMapper for this
-            return new PrescriptionDto
-            {
-                Id = prescription.Id,
-                PrescriptionNumber = prescription.PrescriptionNumber,
-                PrescriptionDate = prescription.PrescriptionDate,
-                PatientId = prescription.PatientId,
-                DoctorId = prescription.DoctorId,
-                OPDVisitId = prescription.OPDVisitId,
-                Diagnosis = prescription.Diagnosis,
-                Instructions = prescription.Instructions,
-                FollowUpInstructions = prescription.FollowUpInstructions,
-                Status = prescription.Status,
-                ValidityDays = prescription.ValidityDays,
-                ValidUntil = prescription.ValidUntil,
-                IsValid = prescription.IsValid(),
-                CreatedAt = prescription.CreatedAt,
-                UpdatedAt = prescription.UpdatedAt
-            };
-        }
-
-        private PrescriptionDetailDto MapToPrescriptionDetailDto(Core.Entities.Clinical.Prescription prescription)
-        {
-            // Map entity to detail DTO - implement this properly
-            var dto = new PrescriptionDetailDto
-            {
-                Id = prescription.Id,
-                PrescriptionNumber = prescription.PrescriptionNumber,
-                PrescriptionDate = prescription.PrescriptionDate,
-                PatientId = prescription.PatientId,
-                DoctorId = prescription.DoctorId,
-                OPDVisitId = prescription.OPDVisitId,
-                Diagnosis = prescription.Diagnosis,
-                Instructions = prescription.Instructions,
-                FollowUpInstructions = prescription.FollowUpInstructions,
-                Status = prescription.Status,
-                ValidityDays = prescription.ValidityDays,
-                ValidUntil = prescription.ValidUntil,
-                IsValid = prescription.IsValid(),
-                CreatedAt = prescription.CreatedAt,
-                UpdatedAt = prescription.UpdatedAt
-            };
-
-            // Add mapping for medicines, complaints, advised items here
-            return dto;
-        }
-
-        private Guid GetCurrentUserId()
-        {
-            // TODO: Replace with actual authentication
+            // Try to get from header
             if (Request.Headers.TryGetValue("X-User-Id", out var userIdHeader) &&
-                Guid.TryParse(userIdHeader, out var userId))
+                Guid.TryParse(userIdHeader, out var parsedUserId))
             {
-                return userId;
+                return parsedUserId;
             }
 
-            return Guid.Parse("11111111-1111-1111-1111-111111111111");
+            // TODO: In production, use proper authentication
+            // For now, use a default or throw exception
+            throw new UnauthorizedAccessException("User not authenticated. Please provide X-User-Id header.");
         }
     }
 }

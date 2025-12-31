@@ -1,4 +1,5 @@
 ﻿using CompileCares.Core.Common;
+using CompileCares.Core.Entities.Doctors;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,11 +14,15 @@ namespace CompileCares.Core.Entities.Templates
         public Guid? DoctorId { get; private set; }
         public bool IsPublic { get; private set; }
 
+        // ========== ADD THESE PROPERTIES ==========
+        public int UsageCount { get; private set; } = 0;
+        public DateTime LastUsed { get; private set; } = DateTime.UtcNow;
+        public bool IsDeleted { get; private set; } = false;
+        public virtual Doctor? Doctor { get; private set; } // Navigation property
+
         public virtual ICollection<TemplateComplaint> Complaints { get; private set; } = new List<TemplateComplaint>();
         public virtual ICollection<TemplateMedicine> Medicines { get; private set; } = new List<TemplateMedicine>();
         public virtual ICollection<TemplateAdvised> AdvisedItems { get; private set; } = new List<TemplateAdvised>();
-
-        // ========== ADD THESE DOMAIN METHODS ==========
 
         // Private constructor for EF Core
         private PrescriptionTemplate() { }
@@ -43,6 +48,63 @@ namespace CompileCares.Core.Entities.Templates
             if (createdBy.HasValue)
                 SetCreatedBy(createdBy.Value);
         }
+
+        // ========== ADD THESE METHODS ==========
+
+        // Delete template (soft delete)
+        public void Delete(Guid deletedBy)
+        {
+            IsDeleted = true;
+            SetUpdatedBy(deletedBy);
+            UpdatedAt = DateTime.UtcNow;
+        }
+
+        // Record template usage
+        public void RecordUsage()
+        {
+            UsageCount++;
+            LastUsed = DateTime.UtcNow;
+            UpdatedAt = DateTime.UtcNow;
+        }
+
+        // Set usage count (for clone/reset)
+        public void SetUsageCount(int count)
+        {
+            if (count < 0)
+                throw new ArgumentException("Usage count cannot be negative");
+
+            UsageCount = count;
+            LastUsed = DateTime.UtcNow;
+        }
+
+        // Set DoctorId (for clone to another doctor)
+        public void SetDoctorId(Guid? doctorId, Guid? updatedBy = null)
+        {
+            DoctorId = doctorId;
+
+            if (updatedBy.HasValue)
+                SetUpdatedBy(updatedBy.Value);
+        }
+
+        // Set Description
+        public void SetDescription(string? description, Guid? updatedBy = null)
+        {
+            Description = description;
+
+            if (updatedBy.HasValue)
+                SetUpdatedBy(updatedBy.Value);
+        }
+
+        // Set Category
+        public void SetCategory(string? category, Guid? updatedBy = null)
+        {
+            Category = category;
+
+            if (updatedBy.HasValue)
+                SetUpdatedBy(updatedBy.Value);
+        }
+
+        // ========== EXISTING METHODS ==========
 
         // Update basic info
         public void UpdateBasicInfo(
@@ -196,7 +258,12 @@ namespace CompileCares.Core.Entities.Templates
                 Description,
                 Category,
                 IsPublic,
-                clonedBy);
+                clonedBy)
+            {
+                // Reset usage statistics for clone
+                UsageCount = 0,
+                LastUsed = DateTime.UtcNow
+            };
 
             // Clone complaints
             foreach (var complaint in Complaints)

@@ -1,4 +1,5 @@
-﻿using CompileCares.Core.Entities.Billing;
+﻿using CompileCares.Core.Entities;
+using CompileCares.Core.Entities.Billing;
 using CompileCares.Core.Entities.Clinical;
 using CompileCares.Core.Entities.ClinicalMaster;
 using CompileCares.Core.Entities.Doctors;
@@ -35,7 +36,8 @@ namespace CompileCares.Infrastructure.Data
                     sqlOptions => sqlOptions.MigrationsAssembly("CompileCares.Infrastructure"));
             }
         }
-
+        // ========== User management ==========
+        public DbSet<User> Users { get; set; }
         // ========== PATIENT RELATED ==========
         public DbSet<Patient> Patients { get; set; }
 

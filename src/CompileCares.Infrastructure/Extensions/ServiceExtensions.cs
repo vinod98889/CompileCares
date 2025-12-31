@@ -1,10 +1,13 @@
 ﻿using CompileCares.Application.Common.Interfaces;
+using CompileCares.Application.Features.Pharmacy.Services;
 using CompileCares.Application.Interfaces;
 using CompileCares.Application.Services;
+using CompileCares.Application.Services.Auth;
 using CompileCares.Infrastructure.Data;
 using CompileCares.Infrastructure.Repositories;
 using CompileCares.Infrastructure.Repositories.SpecificRepositories;
 using CompileCares.Infrastructure.Services;
+using CompileCares.Infrastructure.Services.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -54,7 +57,10 @@ namespace CompileCares.Infrastructure.Extensions
             services.AddScoped<IConsultationService, ConsultationService>();
             services.AddScoped<IPrescriptionService, PrescriptionService>();
             services.AddScoped<IBillingService, BillingService>();
-
+            services.AddScoped<IVisitService, VisitService>();
+            services.AddScoped<IPharmacyService, PharmacyService>();
+            services.AddScoped<ITemplateService, TemplateService>();
+            services.AddScoped<ITokenService, TokenService>();
             // ========== HEALTH CHECKS ==========
             // Add database health check
             services.AddHealthChecks()

@@ -3,23 +3,35 @@ using CompileCares.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services
+// Add services using extension method
 builder.Services.AddApplicationServices(builder.Configuration);
 
 var app = builder.Build();
 
-// Configure pipeline
+// ========== CONFIGURE PIPELINE ==========
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "CompileCares API v1");
+        c.OAuthClientId("swagger");
+        c.OAuthAppName("CompileCares API");
+    });
 }
 
 app.UseHttpsRedirection();
-app.UseAuthorization();
+
+// Add CORS
+app.UseCors("AllowAll");
+
+// 🚨 MUST BE IN THIS ORDER:
+app.UseAuthentication(); // 1. Check authentication
+app.UseAuthorization();  // 2. Check authorization
+
 app.MapControllers();
 
-// 🚨 ADD THIS DATABASE CREATION CODE (BEFORE app.Run())
+// 🚨 DATABASE CREATION
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

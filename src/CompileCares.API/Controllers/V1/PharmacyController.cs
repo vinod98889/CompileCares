@@ -6,6 +6,7 @@ using CompileCares.Application.Features.Pharmacy.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 
 namespace CompileCares.API.Controllers
 {
@@ -223,13 +224,22 @@ namespace CompileCares.API.Controllers
 
         private Guid GetCurrentUserId()
         {
-            var userIdClaim = User.FindFirst("sub") ?? User.FindFirst("userId");
-            if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out var userId))
+            var userIdClaim = User.FindFirst("sub")?.Value
+                            ?? User.FindFirst("UserId")?.Value
+                            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value; // This matches your claim
+
+            if (string.IsNullOrEmpty(userIdClaim))
             {
-                return userId;
+                // For debugging, log all available claims
+                var allClaims = User.Claims.Select(c => $"{c.Type}: {c.Value}").ToList();
+                _logger.LogError("User ID not found in token. Available claims: {@Claims}", allClaims);
+                throw new UnauthorizedAccessException("User ID not found in token.");
             }
 
-            throw new UnauthorizedAccessException("Unable to determine current user ID");
+            if (Guid.TryParse(userIdClaim, out var userId))
+                return userId;
+
+            throw new UnauthorizedAccessException($"Invalid User ID format in token: {userIdClaim}");
         }
     }
 }

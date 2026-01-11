@@ -1,15 +1,18 @@
-﻿using CompileCares.Application.Common.DTOs;
+﻿using CompileCares.API.Models.Responses;
+using CompileCares.Application.Common.DTOs;
 using CompileCares.Application.Common.Exceptions;
 using CompileCares.Application.Features.Templates.DTOs;
 using CompileCares.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 
 namespace CompileCares.Api.Controllers
 {
     [ApiController]
-    [Route("api/v1/templates")]    
+    [Route("api/v1/templates")]
+    [Authorize] // Require authentication for all endpoints
     public class TemplatesController : ControllerBase
     {
         private readonly ITemplateService _templateService;
@@ -25,15 +28,31 @@ namespace CompileCares.Api.Controllers
 
         private Guid GetCurrentUserId()
         {
-            var userIdClaim = User.FindFirst("sub")?.Value ?? User.FindFirst("UserId")?.Value;
+            var userIdClaim = User.FindFirst("sub")?.Value
+                            ?? User.FindFirst("UserId")?.Value
+                            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value; // This matches your claim
+
+            if (string.IsNullOrEmpty(userIdClaim))
+            {
+                // For debugging, log all available claims
+                var allClaims = User.Claims.Select(c => $"{c.Type}: {c.Value}").ToList();
+                _logger.LogError("User ID not found in token. Available claims: {@Claims}", allClaims);
+                throw new UnauthorizedAccessException("User ID not found in token.");
+            }
+
             if (Guid.TryParse(userIdClaim, out var userId))
                 return userId;
 
-            throw new UnauthorizedAccessException("User ID not found in token.");
+            throw new UnauthorizedAccessException($"Invalid User ID format in token: {userIdClaim}");
         }
 
         private Guid? GetCurrentDoctorId()
         {
+            // Check if user is admin first
+            var isAdmin = IsAdmin();
+            if (isAdmin)
+                return null; // Admin doesn't need a DoctorId
+
             var doctorIdClaim = User.FindFirst("DoctorId")?.Value;
             if (Guid.TryParse(doctorIdClaim, out var doctorId))
                 return doctorId;
@@ -41,10 +60,15 @@ namespace CompileCares.Api.Controllers
             return null;
         }
 
+        private bool IsAdmin()
+        {
+            return User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+        }
+
         /// <summary>
         /// Create a new prescription template
         /// </summary>
-        [HttpPost]        
+        [HttpPost]
         [ProducesResponseType(typeof(PrescriptionTemplateDto), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
@@ -52,7 +76,41 @@ namespace CompileCares.Api.Controllers
         {
             try
             {
-                var doctorId = GetCurrentDoctorId();
+                Guid? doctorId = null;
+                var isAdmin = IsAdmin();
+
+                // First, try to get DoctorId from the request (for Admins)
+                if (request.DoctorId.HasValue)
+                {
+                    // Admins can assign templates to any doctor
+                    if (isAdmin)
+                    {
+                        doctorId = request.DoctorId.Value;
+                    }
+                    else
+                    {
+                        // Regular doctors can only create templates for themselves
+                        var currentDoctorId = GetCurrentDoctorId();
+                        if (currentDoctorId.HasValue && request.DoctorId.Value != currentDoctorId.Value)
+                        {
+                            return Forbid("You can only create templates for yourself.");
+                        }
+                        doctorId = request.DoctorId.Value;
+                    }
+                }
+                else
+                {
+                    // If no DoctorId in request
+                    if (isAdmin)
+                    {
+                        // Admin must specify a DoctorId when creating templates
+                        return BadRequest("DoctorId is required when creating templates as an admin.");
+                    }
+
+                    // Get DoctorId from claims (for regular doctors)
+                    doctorId = GetCurrentDoctorId();
+                }
+
                 if (!doctorId.HasValue)
                     return Unauthorized("Doctor ID is required to create templates.");
 
@@ -87,10 +145,13 @@ namespace CompileCares.Api.Controllers
             try
             {
                 var doctorId = GetCurrentDoctorId();
-                if (!doctorId.HasValue)
+                var isAdmin = IsAdmin();
+
+                // For non-admin users, doctorId must be present
+                if (!isAdmin && !doctorId.HasValue)
                     return Unauthorized("Doctor ID is required to access templates.");
 
-                var result = await _templateService.GetTemplateAsync(id, doctorId.Value);
+                var result = await _templateService.GetTemplateAsync(id, doctorId, isAdmin);
                 return Ok(result);
             }
             catch (NotFoundException ex)
@@ -130,10 +191,13 @@ namespace CompileCares.Api.Controllers
             try
             {
                 var doctorId = GetCurrentDoctorId();
-                if (!doctorId.HasValue)
+                var isAdmin = IsAdmin();
+
+                // For non-admin users, doctorId must be present
+                if (!isAdmin && !doctorId.HasValue)
                     return Unauthorized("Doctor ID is required to access templates.");
 
-                var result = await _templateService.GetTemplateDetailsAsync(id, doctorId.Value);
+                var result = await _templateService.GetTemplateDetailsAsync(id, doctorId, isAdmin);
                 return Ok(result);
             }
             catch (NotFoundException ex)
@@ -164,7 +228,7 @@ namespace CompileCares.Api.Controllers
         /// <summary>
         /// Update template metadata
         /// </summary>
-        [HttpPut("{id}")]        
+        [HttpPut("{id}")]
         [ProducesResponseType(typeof(PrescriptionTemplateDto), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -174,10 +238,14 @@ namespace CompileCares.Api.Controllers
             try
             {
                 var doctorId = GetCurrentDoctorId();
-                if (!doctorId.HasValue)
+                var isAdmin = IsAdmin();
+
+                // For non-admin users, doctorId must be present
+                if (!isAdmin && !doctorId.HasValue)
                     return Unauthorized("Doctor ID is required to update templates.");
 
-                var result = await _templateService.UpdateTemplateAsync(id, request, doctorId.Value);
+                var updatedBy = doctorId ?? GetCurrentUserId();
+                var result = await _templateService.UpdateTemplateAsync(id, request, updatedBy, isAdmin);
                 return Ok(result);
             }
             catch (NotFoundException ex)
@@ -217,7 +285,7 @@ namespace CompileCares.Api.Controllers
         /// <summary>
         /// Delete template
         /// </summary>
-        [HttpDelete("{id}")]        
+        [HttpDelete("{id}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
@@ -226,12 +294,15 @@ namespace CompileCares.Api.Controllers
             try
             {
                 var doctorId = GetCurrentDoctorId();
-                if (!doctorId.HasValue)
+                var isAdmin = IsAdmin();
+
+                // For non-admin users, doctorId must be present
+                if (!isAdmin && !doctorId.HasValue)
                     return Unauthorized("Doctor ID is required to delete templates.");
 
-                var success = await _templateService.DeleteTemplateAsync(id, doctorId.Value);
+                var success = await _templateService.DeleteTemplateAsync(id, doctorId, isAdmin);
                 if (success)
-                    return NoContent();
+                    return Ok(ApiResponse.SuccessResponse("Template deleted successfully"));
 
                 return StatusCode(StatusCodes.Status500InternalServerError, "Failed to delete template.");
             }
@@ -263,7 +334,7 @@ namespace CompileCares.Api.Controllers
         /// <summary>
         /// Clone template
         /// </summary>
-        [HttpPost("{id}/clone")]        
+        [HttpPost("{id}/clone")]
         [ProducesResponseType(typeof(PrescriptionTemplateDto), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -273,10 +344,14 @@ namespace CompileCares.Api.Controllers
             try
             {
                 var doctorId = GetCurrentDoctorId();
-                if (!doctorId.HasValue)
+                var isAdmin = IsAdmin();
+
+                // For non-admin users, doctorId must be present
+                if (!isAdmin && !doctorId.HasValue)
                     return Unauthorized("Doctor ID is required to clone templates.");
 
-                var result = await _templateService.CloneTemplateAsync(id, request, doctorId.Value);
+                var createdBy = doctorId ?? GetCurrentUserId();
+                var result = await _templateService.CloneTemplateAsync(id, request, createdBy, isAdmin);
                 return CreatedAtAction(nameof(GetTemplate), new { id = result.Id }, result);
             }
             catch (NotFoundException ex)
@@ -324,10 +399,13 @@ namespace CompileCares.Api.Controllers
             try
             {
                 var doctorId = GetCurrentDoctorId();
-                if (!doctorId.HasValue)
+                var isAdmin = IsAdmin();
+
+                // For non-admin users, doctorId must be present
+                if (!isAdmin && !doctorId.HasValue)
                     return Unauthorized("Doctor ID is required to search templates.");
 
-                var result = await _templateService.SearchTemplatesAsync(request, doctorId.Value);
+                var result = await _templateService.SearchTemplatesAsync(request, doctorId, isAdmin);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -348,10 +426,13 @@ namespace CompileCares.Api.Controllers
             try
             {
                 var doctorId = GetCurrentDoctorId();
-                if (!doctorId.HasValue)
+                var isAdmin = IsAdmin();
+
+                // For non-admin users, doctorId must be present
+                if (!isAdmin && !doctorId.HasValue)
                     return Unauthorized("Doctor ID is required to access templates.");
 
-                var result = await _templateService.GetTemplatesByCategoryAsync(category, doctorId.Value);
+                var result = await _templateService.GetTemplatesByCategoryAsync(category, doctorId, isAdmin);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -365,7 +446,7 @@ namespace CompileCares.Api.Controllers
         /// Get public templates
         /// </summary>
         [HttpGet("public")]
-        [AllowAnonymous]
+        [AllowAnonymous] // This endpoint remains public
         [ProducesResponseType(typeof(List<PrescriptionTemplateDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetPublicTemplates([FromQuery] Guid? doctorId = null)
         {
@@ -384,7 +465,7 @@ namespace CompileCares.Api.Controllers
         /// <summary>
         /// Get template statistics
         /// </summary>
-        [HttpGet("statistics")]        
+        [HttpGet("statistics")]
         [ProducesResponseType(typeof(TemplateStatisticsDto), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> GetTemplateStatistics()
@@ -392,10 +473,13 @@ namespace CompileCares.Api.Controllers
             try
             {
                 var doctorId = GetCurrentDoctorId();
-                if (!doctorId.HasValue)
+                var isAdmin = IsAdmin();
+
+                // For non-admin users, doctorId must be present
+                if (!isAdmin && !doctorId.HasValue)
                     return Unauthorized("Doctor ID is required to access statistics.");
 
-                var result = await _templateService.GetTemplateStatisticsAsync(doctorId.Value);
+                var result = await _templateService.GetTemplateStatisticsAsync(doctorId, isAdmin);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -408,7 +492,7 @@ namespace CompileCares.Api.Controllers
         /// <summary>
         /// Increment template usage count
         /// </summary>
-        [HttpPost("{id}/usage")]        
+        [HttpPost("{id}/usage")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
@@ -417,10 +501,13 @@ namespace CompileCares.Api.Controllers
             try
             {
                 var doctorId = GetCurrentDoctorId();
-                if (!doctorId.HasValue)
+                var isAdmin = IsAdmin();
+
+                // For non-admin users, doctorId must be present
+                if (!isAdmin && !doctorId.HasValue)
                     return Unauthorized("Doctor ID is required to use templates.");
 
-                var result = await _templateService.IncrementUsageCountAsync(id, doctorId.Value);
+                var result = await _templateService.IncrementUsageCountAsync(id, doctorId, isAdmin);
                 return Ok(new { UsageCount = result });
             }
             catch (NotFoundException ex)
@@ -451,7 +538,7 @@ namespace CompileCares.Api.Controllers
         /// <summary>
         /// Update template items (complaints, medicines, advised items)
         /// </summary>
-        [HttpPut("{id}/items")]        
+        [HttpPut("{id}/items")]
         [ProducesResponseType(typeof(PrescriptionTemplateDto), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -461,10 +548,14 @@ namespace CompileCares.Api.Controllers
             try
             {
                 var doctorId = GetCurrentDoctorId();
-                if (!doctorId.HasValue)
+                var isAdmin = IsAdmin();
+
+                // For non-admin users, doctorId must be present
+                if (!isAdmin && !doctorId.HasValue)
                     return Unauthorized("Doctor ID is required to update templates.");
 
-                var result = await _templateService.UpdateTemplateItemsAsync(id, request, doctorId.Value);
+                var updatedBy = doctorId ?? GetCurrentUserId();
+                var result = await _templateService.UpdateTemplateItemsAsync(id, request, updatedBy, isAdmin);
                 return Ok(result);
             }
             catch (NotFoundException ex)
@@ -504,7 +595,7 @@ namespace CompileCares.Api.Controllers
         /// <summary>
         /// Get template for prescription generation
         /// </summary>
-        [HttpGet("{id}/prescription")]        
+        [HttpGet("{id}/prescription")]
         [ProducesResponseType(typeof(TemplateDetailDto), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
@@ -513,14 +604,17 @@ namespace CompileCares.Api.Controllers
             try
             {
                 var doctorId = GetCurrentDoctorId();
-                if (!doctorId.HasValue)
+                var isAdmin = IsAdmin();
+
+                // For non-admin users, doctorId must be present
+                if (!isAdmin && !doctorId.HasValue)
                     return Unauthorized("Doctor ID is required to use templates.");
 
                 // Increment usage count
-                await _templateService.IncrementUsageCountAsync(id, doctorId.Value);
+                await _templateService.IncrementUsageCountAsync(id, doctorId, isAdmin);
 
                 // Get template details
-                var result = await _templateService.GetTemplateDetailsAsync(id, doctorId.Value);
+                var result = await _templateService.GetTemplateDetailsAsync(id, doctorId, isAdmin);
                 return Ok(result);
             }
             catch (NotFoundException ex)

@@ -23,6 +23,7 @@ namespace CompileCares.Infrastructure.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
+        // Create - unchanged
         public async Task<PrescriptionTemplateDto> CreateTemplateAsync(CreateTemplateRequest request, Guid createdBy)
         {
             const string operation = "CreateTemplate";
@@ -128,7 +129,8 @@ namespace CompileCares.Infrastructure.Services
             }
         }
 
-        public async Task<PrescriptionTemplateDto> UpdateTemplateAsync(Guid id, UpdateTemplateRequest request, Guid updatedBy)
+        // Update - with admin support
+        public async Task<PrescriptionTemplateDto> UpdateTemplateAsync(Guid id, UpdateTemplateRequest request, Guid updatedBy, bool isAdmin = false)
         {
             const string operation = "UpdateTemplate";
 
@@ -145,8 +147,8 @@ namespace CompileCares.Infrastructure.Services
                 if (template == null)
                     throw new NotFoundException($"Template with ID '{id}' not found.");
 
-                // Check permission
-                if (template.DoctorId != updatedBy)
+                // Check permission - admin can update any template
+                if (!isAdmin && template.DoctorId != updatedBy)
                     throw new UnauthorizedAccessException("You don't have permission to update this template.");
 
                 // Update template using domain method
@@ -190,7 +192,14 @@ namespace CompileCares.Infrastructure.Services
             }
         }
 
-        public async Task<PrescriptionTemplateDto> GetTemplateAsync(Guid id, Guid doctorId)
+        // Backward compatibility overload
+        public async Task<PrescriptionTemplateDto> UpdateTemplateAsync(Guid id, UpdateTemplateRequest request, Guid updatedBy)
+        {
+            return await UpdateTemplateAsync(id, request, updatedBy, false);
+        }
+
+        // GetTemplate - with admin support (NEW)
+        public async Task<PrescriptionTemplateDto> GetTemplateAsync(Guid id, Guid? doctorId, bool isAdmin = false)
         {
             const string operation = "GetTemplate";
 
@@ -208,9 +217,17 @@ namespace CompileCares.Infrastructure.Services
                 if (template == null)
                     throw new NotFoundException($"Template with ID '{id}' not found.");
 
-                // Check permission
-                if (!template.CanBeUsedBy(doctorId))
-                    throw new UnauthorizedAccessException("You don't have permission to access this template.");
+                // Admin can access any template
+                if (!isAdmin)
+                {
+                    // For non-admin users, doctorId must be provided
+                    if (!doctorId.HasValue)
+                        throw new UnauthorizedAccessException("Doctor ID is required to access templates.");
+
+                    // Check permission for non-admin users
+                    if (!template.CanBeUsedBy(doctorId.Value))
+                        throw new UnauthorizedAccessException("You don't have permission to access this template.");
+                }
 
                 _logger.LogDebug("Retrieved template {TemplateId} from database", id);
                 return await MapToTemplateDto(template);
@@ -232,7 +249,14 @@ namespace CompileCares.Infrastructure.Services
             }
         }
 
-        public async Task<TemplateDetailDto> GetTemplateDetailsAsync(Guid id, Guid doctorId)
+        // Backward compatibility overload
+        public async Task<PrescriptionTemplateDto> GetTemplateAsync(Guid id, Guid doctorId)
+        {
+            return await GetTemplateAsync(id, doctorId, false);
+        }
+
+        // GetTemplateDetails - with admin support (NEW)
+        public async Task<TemplateDetailDto> GetTemplateDetailsAsync(Guid id, Guid? doctorId, bool isAdmin = false)
         {
             const string operation = "GetTemplateDetails";
 
@@ -255,9 +279,17 @@ namespace CompileCares.Infrastructure.Services
                 if (template == null)
                     throw new NotFoundException($"Template with ID '{id}' not found.");
 
-                // Check permission
-                if (!template.CanBeUsedBy(doctorId))
-                    throw new UnauthorizedAccessException("You don't have permission to access this template.");
+                // Admin can access any template
+                if (!isAdmin)
+                {
+                    // For non-admin users, doctorId must be provided
+                    if (!doctorId.HasValue)
+                        throw new UnauthorizedAccessException("Doctor ID is required to access template details.");
+
+                    // Check permission for non-admin users
+                    if (!template.CanBeUsedBy(doctorId.Value))
+                        throw new UnauthorizedAccessException("You don't have permission to access this template.");
+                }
 
                 _logger.LogDebug("Retrieved detailed template {TemplateId} from database", id);
                 return await MapToTemplateDetailDto(template);
@@ -279,7 +311,14 @@ namespace CompileCares.Infrastructure.Services
             }
         }
 
-        public async Task<PagedResponse<PrescriptionTemplateDto>> SearchTemplatesAsync(TemplateSearchRequest request, Guid doctorId)
+        // Backward compatibility overload
+        public async Task<TemplateDetailDto> GetTemplateDetailsAsync(Guid id, Guid doctorId)
+        {
+            return await GetTemplateDetailsAsync(id, doctorId, false);
+        }
+
+        // SearchTemplates - with admin support (NEW)
+        public async Task<PagedResponse<PrescriptionTemplateDto>> SearchTemplatesAsync(TemplateSearchRequest request, Guid? doctorId, bool isAdmin = false)
         {
             const string operation = "SearchTemplates";
 
@@ -299,7 +338,16 @@ namespace CompileCares.Infrastructure.Services
                     .Include(t => t.Complaints)
                     .Include(t => t.Medicines)
                     .Include(t => t.AdvisedItems)
-                    .Where(t => !t.IsDeleted && (t.DoctorId == doctorId || t.IsPublic));
+                    .Where(t => !t.IsDeleted);
+
+                // Admin can see all templates, doctors can only see their own or public ones
+                if (!isAdmin)
+                {
+                    if (!doctorId.HasValue)
+                        throw new UnauthorizedAccessException("Doctor ID is required to search templates.");
+
+                    query = query.Where(t => t.DoctorId == doctorId.Value || t.IsPublic);
+                }
 
                 // Apply filters
                 query = ApplyFilters(query, request);
@@ -335,7 +383,14 @@ namespace CompileCares.Infrastructure.Services
             }
         }
 
-        public async Task<bool> DeleteTemplateAsync(Guid id, Guid deletedBy)
+        // Backward compatibility overload
+        public async Task<PagedResponse<PrescriptionTemplateDto>> SearchTemplatesAsync(TemplateSearchRequest request, Guid doctorId)
+        {
+            return await SearchTemplatesAsync(request, doctorId, false);
+        }
+
+        // DeleteTemplate - with admin support (NEW)
+        public async Task<bool> DeleteTemplateAsync(Guid id, Guid? deletedBy, bool isAdmin = false)
         {
             const string operation = "DeleteTemplate";
 
@@ -349,8 +404,8 @@ namespace CompileCares.Infrastructure.Services
                 if (template == null)
                     throw new NotFoundException($"Template with ID '{id}' not found.");
 
-                // Check permission
-                if (template.DoctorId != deletedBy)
+                // Check permission - admin can delete any template
+                if (!isAdmin && (!deletedBy.HasValue || template.DoctorId != deletedBy.Value))
                     throw new UnauthorizedAccessException("You don't have permission to delete this template.");
 
                 // Soft delete
@@ -383,7 +438,14 @@ namespace CompileCares.Infrastructure.Services
             }
         }
 
-        public async Task<PrescriptionTemplateDto> CloneTemplateAsync(Guid sourceTemplateId, CloneTemplateRequest request, Guid createdBy)
+        // Backward compatibility overload
+        public async Task<bool> DeleteTemplateAsync(Guid id, Guid deletedBy)
+        {
+            return await DeleteTemplateAsync(id, deletedBy, false);
+        }
+
+        // CloneTemplate - with admin support (NEW)
+        public async Task<PrescriptionTemplateDto> CloneTemplateAsync(Guid sourceTemplateId, CloneTemplateRequest request, Guid createdBy, bool isAdmin = false)
         {
             const string operation = "CloneTemplate";
 
@@ -403,9 +465,12 @@ namespace CompileCares.Infrastructure.Services
                 if (sourceTemplate == null)
                     throw new NotFoundException($"Source template with ID '{sourceTemplateId}' not found.");
 
-                // Check permission to clone
-                if (!sourceTemplate.CanBeUsedBy(createdBy))
-                    throw new UnauthorizedAccessException("You don't have permission to clone this template.");
+                // Admin can clone any template, others need permission
+                if (!isAdmin)
+                {
+                    if (!sourceTemplate.CanBeUsedBy(createdBy))
+                        throw new UnauthorizedAccessException("You don't have permission to clone this template.");
+                }
 
                 // Use domain clone method
                 var clonedTemplate = sourceTemplate.Clone(
@@ -464,21 +529,38 @@ namespace CompileCares.Infrastructure.Services
             }
         }
 
-        public async Task<TemplateStatisticsDto> GetTemplateStatisticsAsync(Guid doctorId)
+        // Backward compatibility overload
+        public async Task<PrescriptionTemplateDto> CloneTemplateAsync(Guid sourceTemplateId, CloneTemplateRequest request, Guid createdBy)
+        {
+            return await CloneTemplateAsync(sourceTemplateId, request, createdBy, false);
+        }
+
+        // GetTemplateStatistics - with admin support (NEW)
+        public async Task<TemplateStatisticsDto> GetTemplateStatisticsAsync(Guid? doctorId, bool isAdmin = false)
         {
             const string operation = "GetTemplateStatistics";
 
             try
             {
-                // Get all non-deleted templates for the doctor
-                var templates = await _context.PrescriptionTemplates
+                // Build query based on user role
+                var query = _context.PrescriptionTemplates
                     .AsNoTracking()
                     .Include(t => t.Doctor)
                     .Include(t => t.Complaints)
                     .Include(t => t.Medicines)
                     .Include(t => t.AdvisedItems)
-                    .Where(t => !t.IsDeleted && t.DoctorId == doctorId)
-                    .ToListAsync();
+                    .Where(t => !t.IsDeleted);
+
+                // If not admin, filter by doctorId or public templates
+                if (!isAdmin)
+                {
+                    if (!doctorId.HasValue)
+                        throw new UnauthorizedAccessException("Doctor ID is required to access statistics.");
+
+                    query = query.Where(t => t.DoctorId == doctorId.Value);
+                }
+
+                var templates = await query.ToListAsync();
 
                 // Calculate statistics
                 var statistics = new TemplateStatisticsDto
@@ -491,7 +573,6 @@ namespace CompileCares.Infrastructure.Services
                     TemplatesWithComplaints = templates.Count(t => t.Complaints.Any()),
                     TemplatesWithAdvice = templates.Count(t => t.AdvisedItems.Any()),
 
-                    // FIXED: Properly convert double to decimal with rounding
                     AverageMedicinesPerTemplate = templates.Any()
                         ? Math.Round((decimal)templates.Average(t => t.Medicines.Count), 2, MidpointRounding.AwayFromZero)
                         : 0,
@@ -520,7 +601,7 @@ namespace CompileCares.Infrastructure.Services
                     .GroupBy(t => t.Category!)
                     .ToDictionary(g => g.Key, g => g.Count());
 
-                // Templates by doctor (if multiple doctors in query)
+                // Templates by doctor
                 statistics.TemplatesByDoctor = templates
                     .GroupBy(t => t.Doctor?.Name ?? "Unknown")
                     .ToDictionary(g => g.Key, g => g.Count());
@@ -535,7 +616,14 @@ namespace CompileCares.Infrastructure.Services
             }
         }
 
-        public async Task<int> IncrementUsageCountAsync(Guid templateId, Guid doctorId)
+        // Backward compatibility overload
+        public async Task<TemplateStatisticsDto> GetTemplateStatisticsAsync(Guid doctorId)
+        {
+            return await GetTemplateStatisticsAsync(doctorId, false);
+        }
+
+        // IncrementUsageCount - with admin support (NEW)
+        public async Task<int> IncrementUsageCountAsync(Guid templateId, Guid? doctorId, bool isAdmin = false)
         {
             const string operation = "IncrementUsageCount";
 
@@ -548,9 +636,15 @@ namespace CompileCares.Infrastructure.Services
                 if (template == null)
                     throw new NotFoundException($"Template with ID '{templateId}' not found.");
 
-                // Check permission to use
-                if (!template.CanBeUsedBy(doctorId))
-                    throw new UnauthorizedAccessException("You don't have permission to use this template.");
+                // Admin can use any template, others need permission
+                if (!isAdmin)
+                {
+                    if (!doctorId.HasValue)
+                        throw new UnauthorizedAccessException("Doctor ID is required to use templates.");
+
+                    if (!template.CanBeUsedBy(doctorId.Value))
+                        throw new UnauthorizedAccessException("You don't have permission to use this template.");
+                }
 
                 // Use domain method
                 template.RecordUsage();
@@ -580,7 +674,14 @@ namespace CompileCares.Infrastructure.Services
             }
         }
 
-        public async Task<PrescriptionTemplateDto> UpdateTemplateItemsAsync(Guid templateId, UpdateTemplateItemsRequest request, Guid updatedBy)
+        // Backward compatibility overload
+        public async Task<int> IncrementUsageCountAsync(Guid templateId, Guid doctorId)
+        {
+            return await IncrementUsageCountAsync(templateId, doctorId, false);
+        }
+
+        // UpdateTemplateItems - with admin support (NEW)
+        public async Task<PrescriptionTemplateDto> UpdateTemplateItemsAsync(Guid templateId, UpdateTemplateItemsRequest request, Guid updatedBy, bool isAdmin = false)
         {
             const string operation = "UpdateTemplateItems";
 
@@ -599,8 +700,8 @@ namespace CompileCares.Infrastructure.Services
                 if (template == null)
                     throw new NotFoundException($"Template with ID '{templateId}' not found.");
 
-                // Check permission
-                if (template.DoctorId != updatedBy)
+                // Check permission - admin can update any template
+                if (!isAdmin && template.DoctorId != updatedBy)
                     throw new UnauthorizedAccessException("You don't have permission to update this template.");
 
                 // Clear existing items
@@ -708,21 +809,38 @@ namespace CompileCares.Infrastructure.Services
             }
         }
 
-        public async Task<List<PrescriptionTemplateDto>> GetTemplatesByCategoryAsync(string category, Guid doctorId)
+        // Backward compatibility overload
+        public async Task<PrescriptionTemplateDto> UpdateTemplateItemsAsync(Guid templateId, UpdateTemplateItemsRequest request, Guid updatedBy)
+        {
+            return await UpdateTemplateItemsAsync(templateId, request, updatedBy, false);
+        }
+
+        // GetTemplatesByCategory - with admin support (NEW)
+        public async Task<List<PrescriptionTemplateDto>> GetTemplatesByCategoryAsync(string category, Guid? doctorId, bool isAdmin = false)
         {
             const string operation = "GetTemplatesByCategory";
 
             try
             {
-                var templates = await _context.PrescriptionTemplates
+                // Build query
+                var query = _context.PrescriptionTemplates
                     .AsNoTracking()
                     .Include(t => t.Doctor)
                     .Include(t => t.Complaints)
                     .Include(t => t.Medicines)
                     .Include(t => t.AdvisedItems)
-                    .Where(t => !t.IsDeleted &&
-                           (t.DoctorId == doctorId || t.IsPublic) &&
-                           t.Category == category)
+                    .Where(t => !t.IsDeleted && t.Category == category);
+
+                // Admin can see all templates, doctors can only see their own or public ones
+                if (!isAdmin)
+                {
+                    if (!doctorId.HasValue)
+                        throw new UnauthorizedAccessException("Doctor ID is required to access templates.");
+
+                    query = query.Where(t => t.DoctorId == doctorId.Value || t.IsPublic);
+                }
+
+                var templates = await query
                     .OrderBy(t => t.Name)
                     .ToListAsync();
 
@@ -742,6 +860,13 @@ namespace CompileCares.Infrastructure.Services
             }
         }
 
+        // Backward compatibility overload
+        public async Task<List<PrescriptionTemplateDto>> GetTemplatesByCategoryAsync(string category, Guid doctorId)
+        {
+            return await GetTemplatesByCategoryAsync(category, doctorId, false);
+        }
+
+        // GetPublicTemplates - unchanged
         public async Task<List<PrescriptionTemplateDto>> GetPublicTemplatesAsync(Guid? doctorId = null)
         {
             const string operation = "GetPublicTemplates";
@@ -782,7 +907,7 @@ namespace CompileCares.Infrastructure.Services
             }
         }
 
-        #region Private Helper Methods
+        #region Private Helper Methods (Unchanged)
 
         private void ValidateCreateRequest(CreateTemplateRequest request)
         {

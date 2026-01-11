@@ -16,8 +16,7 @@ namespace CompileCares.Core.Entities.Templates
 
         // ========== ADD THESE PROPERTIES ==========
         public int UsageCount { get; private set; } = 0;
-        public DateTime LastUsed { get; private set; } = DateTime.UtcNow;
-        public bool IsDeleted { get; private set; } = false;
+        public DateTime LastUsed { get; private set; } = DateTime.UtcNow;        
         public virtual Doctor? Doctor { get; private set; } // Navigation property
 
         public virtual ICollection<TemplateComplaint> Complaints { get; private set; } = new List<TemplateComplaint>();
@@ -54,9 +53,7 @@ namespace CompileCares.Core.Entities.Templates
         // Delete template (soft delete)
         public void Delete(Guid deletedBy)
         {
-            IsDeleted = true;
-            SetUpdatedBy(deletedBy);
-            UpdatedAt = DateTime.UtcNow;
+            base.SoftDelete(deletedBy);
         }
 
         // Record template usage

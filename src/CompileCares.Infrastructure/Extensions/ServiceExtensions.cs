@@ -61,6 +61,7 @@ namespace CompileCares.Infrastructure.Extensions
             services.AddScoped<IPharmacyService, PharmacyService>();
             services.AddScoped<ITemplateService, TemplateService>();
             services.AddScoped<ITokenService, TokenService>();
+            services.AddScoped<IMasterService, MasterService>();
             // ========== HEALTH CHECKS ==========
             // Add database health check
             services.AddHealthChecks()

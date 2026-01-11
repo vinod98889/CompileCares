@@ -6,6 +6,7 @@
         public string? Description { get; set; }
         public string? Category { get; set; }
         public bool IsPublic { get; set; } = false;
+        public Guid? DoctorId { get; set; }
 
         public List<TemplateComplaintRequest> Complaints { get; set; } = new();
         public List<TemplateMedicineRequest> Medicines { get; set; } = new();

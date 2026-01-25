@@ -18,5 +18,12 @@
     <ProjectReference Include="..\CompileCares.Application\CompileCares.Application.csproj" />
     <ProjectReference Include="..\CompileCares.Infrastructure\CompileCares.Infrastructure.csproj" />
   </ItemGroup>
+	<Target Name="RemoveAllAppSettings" BeforeTargets="BeforeBuild">
+		<ItemGroup>
+			<!-- Remove any appsettings from referenced projects -->
+			<ContentWithTargetPath Remove="@(ContentWithTargetPath)" Condition="'%(Filename)' == 'appsettings'" />
+			<Content Remove="@(Content)" Condition="'%(Filename)' == 'appsettings'" />
+		</ItemGroup>
+	</Target>
 
 </Project>

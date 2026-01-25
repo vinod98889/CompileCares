@@ -193,24 +193,41 @@
         <!-- User Menu -->
         <div class="nav-user">
             <div class="user-dropdown">
-                <button class="user-btn">
+                <button class="user-btn" @onclick="ToggleUserMenu" @onclick:preventDefault>
                     <div class="user-avatar">
                         <i class="fas fa-user-md"></i>
                     </div>
-                    <span class="user-name">Dr. Smith</span>
+                    <span class="user-name">@userName</span>
                     <i class="fas fa-chevron-down"></i>
                 </button>
-                <div class="user-menu">
-                    <a href="#" class="user-item">
+                <div class="user-menu @(showUserMenu ? "active" : "")">
+                    <div class="user-info-section">
+                        <div class="user-avatar-large">
+                            <i class="fas fa-user-md"></i>
+                        </div>
+                        <div class="user-details">
+                            <strong>@userName</strong>                            
+                            @if (!string.IsNullOrEmpty(userEmail))
+                            {
+                                <small class="user-email">@userEmail</small>
+                            }
+                            @if (userDoctorId.HasValue)
+                            {
+                                <small class="user-id">Doctor ID: @userDoctorId.Value.ToString("N")[..8]...</small>
+                            }
+                        </div>
+                    </div>
+                    <div class="user-divider"></div>
+                    <a href="/profile" class="user-item" @onclick="CloseUserMenu">
                         <i class="fas fa-user"></i>
                         My Profile
                     </a>
-                    <a href="#" class="user-item">
+                    <a href="/settings" class="user-item" @onclick="CloseUserMenu">
                         <i class="fas fa-cog"></i>
                         Settings
                     </a>
                     <div class="user-divider"></div>
-                    <a href="#" class="user-item">
+                    <a href="#" class="user-item logout-item" @onclick="HandleLogout">
                         <i class="fas fa-sign-out-alt"></i>
                         Logout
                     </a>

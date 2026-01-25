@@ -1,0 +1,15 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace CompileCares.UI.Services.AuthService
+{
+    public interface IHttpClientService
+    {
+        Task<HttpClient> GetAuthenticatedClientAsync();
+        void ClearAuthentication();
+        bool IsAuthenticated { get; }
+    }
+}

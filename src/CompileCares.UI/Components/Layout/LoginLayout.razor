@@ -1,0 +1,197 @@
+﻿
+@inherits LayoutComponentBase
+@inject IJSRuntime JsRuntime
+
+@using CompileCares.Application.Features.Auth.DTOs
+@inject CompileCares.UI.Services.AuthService.IAuthService AuthService
+@inject NavigationManager Navigation
+
+<div class="login-page">
+    @if (isCheckingSession)
+    {
+        <div class="login-container">
+            <div class="login-card text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3">@infoMessage</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="login-container">
+            <div class="login-card">
+                <h2 class="text-center mb-4">CompileCares Login</h2>
+
+                <EditForm Model="@loginRequest" OnValidSubmit="@HandleLogin">
+                    <DataAnnotationsValidator />
+
+                    <div class="form-group mb-3">
+                        <label class="form-label">Email</label>
+                        <InputText @bind-Value="loginRequest.Email" class="form-control" />
+                        <ValidationMessage For="@(() => loginRequest.Email)" />
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="form-label">Password</label>
+                        <InputText @bind-Value="loginRequest.Password" type="password" class="form-control" />
+                        <ValidationMessage For="@(() => loginRequest.Password)" />
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100" disabled="@isLoading">
+                        @if (isLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span>Logging in...</span>
+                        }
+                        else
+                        {
+                            <span>Login</span>
+                        }
+                    </button>
+                </EditForm>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger mt-3">
+                        @errorMessage
+                    </div>
+                }
+
+                <div class="mt-3 text-center">
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="CreateTestUsers" disabled="@isLoading">
+                        Create Test Users
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private LoginRequest loginRequest = new();
+    private bool isLoading = false;
+    private bool isCheckingSession = true;
+    private string errorMessage = string.Empty;
+    private string infoMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check for existing session
+        await CheckExistingSession();
+    }
+
+    private async Task CheckExistingSession()
+    {
+        try
+        {
+            infoMessage = "Checking saved session...";
+
+            // RESTORE SESSION FIRST - this sets the token in HttpClient
+            var sessionRestored = await AuthService.RestoreSessionAsync();
+
+            if (sessionRestored)
+            {
+                infoMessage = "Session found, redirecting...";
+                await Task.Delay(1000); // Brief delay to show message
+                Navigation.NavigateTo("/", true);
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Session check error: {ex.Message}";
+            Console.WriteLine($"Session check error: {ex}");
+        }
+        finally
+        {
+            isCheckingSession = false;
+            infoMessage = string.Empty;
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            var result = await AuthService.LoginAsync(loginRequest);
+
+            if (result.Success && result.Data != null)
+            {
+                // Login successful, redirect to home
+                Navigation.NavigateTo("/", true);
+            }
+            else
+            {
+                errorMessage = result.Message ?? "Login failed";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Login error: {ex.Message}";
+            Console.WriteLine($"Login error: {ex}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateTestUsers()
+    {
+        try
+        {
+            isLoading = true;
+            var result = await AuthService.CreateTestUsersAsync();
+            if (result.Success)
+            {
+                errorMessage = "Test users created successfully!";
+            }
+            else
+            {
+                errorMessage = result.Message ?? "Failed to create test users";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
+
+<style>
+    .login-page {
+        min-height: 100vh;
+    }
+
+    .login-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+    }
+
+    .login-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        width: 100%;
+        max-width: 400px;
+    }
+
+    .spinner-border {
+        width: 3rem;
+        height: 3rem;
+    }
+</style>

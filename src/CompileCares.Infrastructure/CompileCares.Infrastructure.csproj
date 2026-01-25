@@ -7,15 +7,17 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="appsettings.json" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="appsettings.json">
+    <Content Include="appsettings.Infrastructure.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-
+	<Target Name="RemoveAllAppSettings" BeforeTargets="BeforeBuild">
+		<ItemGroup>
+			<!-- Remove any appsettings from referenced projects -->
+			<ContentWithTargetPath Remove="@(ContentWithTargetPath)" Condition="'%(Filename)' == 'appsettings'" />
+			<Content Remove="@(Content)" Condition="'%(Filename)' == 'appsettings'" />
+		</ItemGroup>
+	</Target>
   <ItemGroup>
     <Folder Include="Data\Migrations\" />
   </ItemGroup>

@@ -62,6 +62,22 @@
         <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.1" />
+
+		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.2" />
+		<PackageReference Include="Microsoft.AspNetCore.Owin" Version="8.0.0" />
+		<PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.2.5" />
     </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\CompileCares.API\CompileCares.API.csproj" />		
+    </ItemGroup>
+
+	<Target Name="RemoveAllAppSettings" BeforeTargets="BeforeBuild">
+		<ItemGroup>
+			<!-- Remove any appsettings from referenced projects -->
+			<ContentWithTargetPath Remove="@(ContentWithTargetPath)" Condition="'%(Filename)' == 'appsettings'" />
+			<Content Remove="@(Content)" Condition="'%(Filename)' == 'appsettings'" />
+		</ItemGroup>
+	</Target>
 
 </Project>

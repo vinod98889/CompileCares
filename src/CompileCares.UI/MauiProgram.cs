@@ -1,5 +1,6 @@
 ﻿using CompileCares.UI.Services.AuthService;
 using CompileCares.UI.Services.BaseAPIService;
+using CompileCares.UI.Services.ConsultationService;
 using CompileCares.UI.Services.ServerService;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -33,7 +34,8 @@ namespace CompileCares.UI
             builder.Services.AddScoped<IBaseApiService, BaseApiService>();
             builder.Services.AddScoped<IAuthService, AuthService>();            
             builder.Services.AddScoped<IHttpClientService, HttpClientService>();
-            builder.Services.AddScoped<IAuthStateService, AuthStateService>();            
+            builder.Services.AddScoped<IAuthStateService, AuthStateService>();
+            builder.Services.AddScoped<IConsultationService, ConsultationService>();
 
             // ✅ PROPERLY REGISTER HttpClient WITH BaseAddress
             builder.Services.AddScoped(sp =>

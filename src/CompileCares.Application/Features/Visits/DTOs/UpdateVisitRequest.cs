@@ -32,5 +32,6 @@
         public string? FollowUpInstructions { get; set; }
         public DateTime? FollowUpDate { get; set; }
         public int? FollowUpDays { get; set; }
+        public string? Notes { get; set; }
     }
 }

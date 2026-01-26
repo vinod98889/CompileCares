@@ -1,7 +1,41 @@
 ﻿@page "/"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
+
 <div class="medical-container">
+    <!-- Status Messages -->
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-circle"></i>
+            @errorMessage
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i>
+            @successMessage
+        </div>
+    }
+
+    @if (isSaving)
+    {
+        <div class="alert alert-info">
+            <i class="fas fa-spinner fa-spin"></i>
+            Saving...
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="alert alert-info">
+            <i class="fas fa-spinner fa-spin"></i>
+            Loading patients...
+        </div>
+    }
+
     <!-- Main Grid Layout -->
     <div class="main-grid">
         <!-- Left Column -->
@@ -27,24 +61,99 @@
                         </div>
                     </div>
                     <div class="form-row">
-                        <div class="input-group search-group">
-                            <label>Patient Name</label>
-                            <div class="search-container">
-                                <i class="fas fa-search search-icon"></i>
-                                <input type="text" class="form-input" placeholder="Search patient...">
-                            </div>
-                        </div>
-                    </div>
+    <div class="input-group search-group">
+        <label>Patient Name</label>
+        <div class="patient-search-controls">
+            <div class="search-container">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" 
+                       class="form-input" 
+                       placeholder="Search patient or enter new patient name..."
+                       @bind="patientSearchText"
+                       @bind:event="oninput" />
+            </div>
+            @if (!string.IsNullOrEmpty(patientSearchText) && !isNewPatient)
+            {
+                <button class="btn btn-success btn-sm" 
+                        @onclick="() => CreateNewPatientFromSearch()">
+                    <i class="fas fa-user-plus"></i> New Patient
+                </button>
+            }
+        </div>
+    </div>
+</div>
+
+@if (isNewPatient)
+{
+    <div class="new-patient-form">
+        <div class="form-row">
+            <div class="input-group">
+                <label>Gender</label>
+                <select class="form-input" @bind="newPatientGender">
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Age</label>
+                <input type="text" 
+                       class="form-input" 
+                       placeholder="Age"
+                       @bind="newPatientAge" />
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="input-group">
+                <label>Mobile</label>
+                <input type="text" 
+                       class="form-input" 
+                       placeholder="Mobile"
+                       @bind="newPatientMobile" />
+            </div>
+        </div>
+        <div class="form-row">
+            <button class="btn btn-primary btn-sm" 
+                    @onclick="SaveNewPatientDetails">
+                <i class="fas fa-check"></i> Save Details
+            </button>
+            <button class="btn btn-danger btn-sm" 
+                    @onclick="CancelNewPatient">
+                <i class="fas fa-times"></i> Cancel
+            </button>
+        </div>
+    </div>
+}
                     <div class="form-row">
                         <div class="input-group">
                             <label>Mobile</label>
-                            <input type="text" class="form-input" placeholder="91">
+                            <input type="text" 
+       class="form-input" 
+       placeholder="Mobile" 
+       @bind="patientMobile"
+       disabled="@selectedPatientId.HasValue">
                         </div>
                         <div class="input-group">
-                            <label>Other</label>
-                            <input type="text" class="form-input" placeholder="...">
+                            <label>Consultation Fee</label>
+                            <input type="number" 
+                                   class="form-input" 
+                                   placeholder="Fee"
+                                   @bind="consultationFee">
                         </div>
                     </div>
+                    @if (selectedPatientId.HasValue)
+                    {
+                        <div class="form-row">
+                            <div class="selected-patient-info">
+                                <span class="patient-badge">
+                                    <i class="fas fa-check-circle"></i>
+                                    Selected: @patients.FirstOrDefault(p => p.Id == selectedPatientId)?.Name
+                                </span>
+                                <button class="btn btn-sm btn-danger" @onclick="ClearPatientSelection">
+                                    <i class="fas fa-times"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
 
@@ -54,7 +163,11 @@
                     <i class="fas fa-map-marker-alt"></i>
                     <h3>Address</h3>
                 </div>
-                <textarea class="form-textarea" placeholder="Patient address..." rows="2"></textarea>
+                <textarea class="form-textarea" 
+          placeholder="Patient address..." 
+          rows="2"
+          @bind="patientAddress"
+          disabled="@selectedPatientId.HasValue"></textarea>
             </div>
 
             <!-- Visit Signs Card -->
@@ -66,27 +179,45 @@
                 <div class="vitals-grid">
                     <div class="vital-item">
                         <label>BP</label>
-                        <input type="text" class="form-input" placeholder="120/40">
+                        <input type="text" 
+                               class="form-input" 
+                               placeholder="120/80"
+                               @bind="bloodPressure">
                     </div>
                     <div class="vital-item">
                         <label>SPO2</label>
-                        <input type="number" class="form-input" placeholder="100">
+                        <input type="number" 
+                               class="form-input" 
+                               placeholder="100"
+                               @bind="spo2">
                     </div>
                     <div class="vital-item">
                         <label>Temp °C</label>
-                        <input type="number" class="form-input" placeholder="35">
+                        <input type="number" 
+                               class="form-input" 
+                               placeholder="37"
+                               @bind="temperature">
+                    </div>
+                    <div class="vital-item">
+                        <label>Pulse</label>
+                        <input type="number" 
+                               class="form-input" 
+                               placeholder="72"
+                               @bind="pulse">
                     </div>
                     <div class="vital-item">
                         <label>Weight</label>
-                        <input type="number" class="form-input" placeholder="75kg">
+                        <input type="text" 
+                               class="form-input" 
+                               placeholder="75kg"
+                               @bind="weight">
                     </div>
                     <div class="vital-item">
-                        <label>Dignosis</label>
-                        <input type="text" class="form-input" placeholder="Suger...">
-                    </div>
-                    <div class="vital-item">
-                        <label>Other</label>
-                        <input type="text" class="form-input" placeholder="None">
+                        <label>Diagnosis</label>
+                        <input type="text" 
+                               class="form-input" 
+                               placeholder="Fever, Cough..."
+                               @bind="diagnosis">
                     </div>
                 </div>
             </div>
@@ -104,7 +235,9 @@
                     <div class="template-search">
                         <div class="search-container">
                             <i class="fas fa-search search-icon"></i>
-                            <input type="text" class="form-input template-input" placeholder="Search templates...">
+                            <input type="text" 
+                                   class="form-input template-input" 
+                                   placeholder="Search templates...">
                         </div>
                     </div>
                 </div>
@@ -113,21 +246,27 @@
                     <div class="input-group">
                         <div class="search-container">
                             <i class="fas fa-search search-icon"></i>
-                            <input type="text" class="form-input" placeholder="Search medicine">
+                            <input type="text" 
+                                   class="form-input" 
+                                   placeholder="Search medicine"
+                                   @bind="medicineSearch">
                         </div>
                     </div>
                     <div class="input-group">
-                        <select class="form-input">
-                            <option>Select Dose</option>
-                            <option>500mg</option>
-                            <option>250mg</option>
-                            <option>100mg</option>
+                        <select class="form-input" @bind="selectedDoseId">
+                            <option value="">Select Dose</option>
+                            <option value="@Guid.NewGuid()">500mg</option>
+                            <option value="@Guid.NewGuid()">250mg</option>
+                            <option value="@Guid.NewGuid()">100mg</option>
                         </select>
                     </div>
                     <div class="input-group">
-                        <input type="text" class="form-input" placeholder="Gly">
+                        <input type="number" 
+                               class="form-input" 
+                               placeholder="Days"
+                               @bind="durationDays">
                     </div>
-                    <button class="btn btn-primary btn-small">
+                    <button class="btn btn-primary btn-small" @onclick="AddMedicine">
                         <i class="fas fa-plus"></i>
                         Add
                     </button>
@@ -140,51 +279,38 @@
                             <tr>
                                 <th>Medicine</th>
                                 <th>Dose</th>
-                                <th>Gly</th>
+                                <th>Duration</th>
+                                <th>Instructions</th>
                                 <th class="action-col">Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>Vitamin C</td>
-                                <td>100mg</td>
-                                <td>1-0-1</td>
-                                <td>
-                                    <button class="icon-btn danger" title="Delete">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Omeprazole</td>
-                                <td>20mg</td>
-                                <td>1-0-0</td>
-                                <td>
-                                    <button class="icon-btn danger" title="Delete">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Diclofenac</td>
-                                <td>50mg</td>
-                                <td>1-0-1</td>
-                                <td>
-                                    <button class="icon-btn danger" title="Delete">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Montelukast</td>
-                                <td>10mg</td>
-                                <td>0-0-1</td>
-                                <td>
-                                    <button class="icon-btn danger" title="Delete">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
+                            @if (medicines.Any())
+                            {
+                                @for (int i = 0; i < medicines.Count; i++)
+                                {
+                                    var medicine = medicines[i];
+                                    <tr>
+                                        <td>Medicine @i</td>
+                                        <td>@(medicine.DoseId.ToString().Substring(0, 8))...</td>
+                                        <td>@medicine.DurationDays days</td>
+                                        <td>@medicine.Instructions</td>
+                                        <td>
+                                            <button class="icon-btn danger" 
+                                                    title="Delete"
+                                                    @onclick="@(() => RemoveMedicine(i))">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-center">No medicines added</td>
+                                </tr>
+                            }
                         </tbody>
                     </table>
                 </div>
@@ -193,13 +319,33 @@
                 <div class="advice-section">
                     <div class="input-group">
                         <label>Medical Advice</label>
-                        <select class="form-input">
-                            <option>Select Medical Advice</option>
-                            <option>Take medicine after food</option>
-                            <option>Do not eat after 6PM</option>
-                            <option>Drink plenty of water</option>
-                            <option>Take complete rest</option>
-                        </select>
+                        <div class="advice-controls">
+                            <div class="search-container">
+                                <i class="fas fa-search search-icon"></i>
+                                <input type="text" 
+                                       class="form-input" 
+                                       placeholder="Add advice..."
+                                       @bind="adviceSearch">
+                            </div>
+                            <button class="btn btn-primary btn-small" @onclick="AddAdvice">
+                                <i class="fas fa-plus"></i> Add
+                            </button>
+                        </div>
+                        @if (selectedAdvice.Any())
+                        {
+                            <div class="advice-list">
+                                @for (int i = 0; i < selectedAdvice.Count; i++)
+                                {
+                                    <div class="advice-item">
+                                        <span>@selectedAdvice[i]</span>
+                                        <button class="icon-btn danger btn-sm" 
+                                                @onclick="@(() => RemoveAdvice(i))">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
@@ -213,14 +359,12 @@
                     </div>
                     <div class="date-filter-controls">
                         <div class="date-input-group">
-                            @* <label>Start Date</label> *@
                             <div class="date-container">
                                 <i class="fas fa-calendar date-icon"></i>
                                 <input type="date" class="form-input date-input">
                             </div>
                         </div>
                         <div class="date-input-group">
-                            @*  <label>End Date</label> *@
                             <div class="date-container">
                                 <i class="fas fa-calendar date-icon"></i>
                                 <input type="date" class="form-input date-input">
@@ -243,66 +387,30 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>12/15/23</td>
-                                <td>Fever, Headache</td>
-                                <td>Paracetamol</td>
-                                <td>
-                                    <button class="icon-btn primary" title="View">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>12/10/23</td>
-                                <td>Cough & Cold</td>
-                                <td>Amoxicillin</td>
-                                <td>
-                                    <button class="icon-btn primary" title="View">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>12/05/23</td>
-                                <td>Stomach Pain</td>
-                                <td>Antacid</td>
-                                <td>
-                                    <button class="icon-btn primary" title="View">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>12/15/23</td>
-                                <td>Fever, Headache</td>
-                                <td>Paracetamol</td>
-                                <td>
-                                    <button class="icon-btn primary" title="View">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>12/10/23</td>
-                                <td>Cough & Cold</td>
-                                <td>Amoxicillin</td>
-                                <td>
-                                    <button class="icon-btn primary" title="View">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>12/05/23</td>
-                                <td>Stomach Pain</td>
-                                <td>Antacid</td>
-                                <td>
-                                    <button class="icon-btn primary" title="View">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                </td>
-                            </tr>
+                            @if (selectedPatientId.HasValue)
+                            {
+                               @*  <!-- This would be populated with actual patient history --> *@
+                                <tr>
+                                    <td colspan="4" class="text-center">
+                                        @if (isLoading)
+                                        {
+                                            <i class="fas fa-spinner fa-spin">Loading history...</i> 
+                                        }
+                                        else
+                                        {
+                                            <span>No history found for this patient</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="4" class="text-center">
+                                        <span>Select a patient to view history</span>
+                                    </td>
+                                </tr>
+                            }
                         </tbody>
                     </table>
                 </div>
@@ -321,10 +429,16 @@
                     <div class="input-group">
                         <div class="search-container">
                             <i class="fas fa-search search-icon"></i>
-                            <input type="text" class="form-input" placeholder="Search complaints...">
+                            <input type="text" 
+                                   class="form-input" 
+                                   placeholder="Add complaint..."
+                                   @bind="complaintInput"
+                                   @onkeypress="@(e => {
+                                       if (e.Key == "Enter") AddComplaint();
+                                   })" />
                         </div>
                     </div>
-                    <button class="btn btn-primary btn-small">
+                    <button class="btn btn-primary btn-small" @onclick="AddComplaint">
                         <i class="fas fa-plus"></i>
                         Add
                     </button>
@@ -338,38 +452,28 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>High Fever</td>
-                                <td>
-                                    <button class="icon-btn danger" title="Delete">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Headache</td>
-                                <td>
-                                    <button class="icon-btn danger" title="Delete">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Body Ache</td>
-                                <td>
-                                    <button class="icon-btn danger" title="Delete">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Loss of Appetite</td>
-                                <td>
-                                    <button class="icon-btn danger" title="Delete">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
+                            @if (complaints.Any())
+                            {
+                                @for (int i = 0; i < complaints.Count; i++)
+                                {
+                                    <tr>
+                                        <td>@complaints[i]</td>
+                                        <td>
+                                            <button class="icon-btn danger" 
+                                                    title="Delete"
+                                                    @onclick="@(() => RemoveComplaint(i))">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="2" class="text-center">No complaints added</td>
+                                </tr>
+                            }
                         </tbody>
                     </table>
                 </div>
@@ -381,7 +485,52 @@
                     <i class="fas fa-notes-medical"></i>
                     <h3>History & Follow Up</h3>
                 </div>
-                <textarea class="form-textarea" placeholder="Follow up notes, next visit instructions, patient progress..." rows="5"></textarea>
+                <div class="follow-up-controls">
+                    <div class="form-row">
+                        <div class="input-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" @bind="setFollowUp" />
+                                <span>Set Follow-up</span>
+                            </label>
+                        </div>
+                        @if (setFollowUp)
+                        {
+                            <div class="input-group">
+                                <input type="number" 
+                                       class="form-input" 
+                                       placeholder="Days"
+                                       @bind="followUpDays" />
+                            </div>
+                        }
+                    </div>
+                </div>
+                <textarea class="form-textarea" 
+                          placeholder="Follow up notes, next visit instructions, patient progress..." 
+                          rows="5"
+                          @bind="followUpNotes"></textarea>
+            </div>
+
+            <!-- Payment Mode -->
+            <div class="compact-card">
+                <div class="card-header">
+                    <i class="fas fa-credit-card"></i>
+                    <h3>Payment</h3>
+                </div>
+                <div class="payment-controls">
+                    <div class="input-group">
+                        <label>Payment Mode</label>
+                        <select class="form-input" @bind="paymentMode">
+                            <option value="Cash">Cash</option>
+                            <option value="Card">Card</option>
+                            <option value="UPI">UPI</option>
+                            <option value="Insurance">Insurance</option>
+                        </select>
+                    </div>
+                    <div class="fee-display">
+                        <label>Consultation Fee:</label>
+                        <span class="fee-amount">₹ @consultationFee</span>
+                    </div>
+                </div>
             </div>
 
             <!-- Compact Actions -->
@@ -392,30 +541,250 @@
                 </div>
                 <div class="action-buttons-compact">
                     <div class="action-group">
-                        <button class="btn btn-success btn-compact" title="Save Prescription">
+                        <button class="btn btn-success btn-compact" 
+                                title="Save Prescription"
+                                @onclick="SavePrescription"
+                                disabled="@isSaving">
                             <i class="fas fa-save"></i>
                             Save
                         </button>
-                        <button class="btn btn-primary btn-compact" title="Save and Print">
+                        <button class="btn btn-primary btn-compact" 
+                                title="Save and Print"
+                                @onclick="SaveAndPrint"
+                                disabled="@isSaving">
                             <i class="fas fa-print"></i>
                             Print
                         </button>
                     </div>
                     <div class="action-group">
-                        <button class="btn btn-info btn-compact" title="Print Bill">
+                        <button class="btn btn-info btn-compact" 
+                                title="Quick Consultation"
+                                @onclick="QuickConsultation"
+                                disabled="@isSaving">
+                            <i class="fas fa-bolt"></i>
+                            Quick
+                        </button>
+                        <button class="btn btn-warning btn-compact" 
+                                title="Ultra Quick"
+                                @onclick="UltraQuickConsultation"
+                                disabled="@isSaving">
+                            <i class="fas fa-running"></i>
+                            Ultra
+                        </button>
+                    </div>
+                    <div class="action-group">
+                        <button class="btn btn-info btn-compact" 
+                                title="Print Bill"
+                                @onclick="PrintBill">
                             <i class="fas fa-file-invoice"></i>
                             Bill
                         </button>
-                        <button class="btn btn-danger btn-compact" title="Clear All">
+                        <button class="btn btn-danger btn-compact" 
+                                title="Clear All"
+                                @onclick="ResetForm"
+                                disabled="@isSaving">
                             <i class="fas fa-broom"></i>
                             Clear
                         </button>
                     </div>
                 </div>
+                <div class="refresh-section">
+                    <button class="btn btn-secondary btn-sm" @onclick="RefreshData">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+@* <style>
+    .alert {
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .alert-info {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+
+    .search-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .search-result-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .search-result-item:hover {
+        background-color: #f5f5f5;
+    }
+
+    .selected-patient-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px;
+        background-color: #e8f5e8;
+        border-radius: 4px;
+        margin-top: 8px;
+    }
+
+    .patient-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #28a745;
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+    }
+
+    .advice-controls {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .advice-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .advice-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 12px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+    }
+
+    .payment-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .fee-display {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+    }
+
+    .fee-amount {
+        font-weight: bold;
+        color: #28a745;
+    }
+
+    .text-center {
+        text-align: center;
+    }
+
+    .refresh-section {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #eee;
+        text-align: center;
+    }
+
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 12px;
+    }
+
+    .follow-up-controls {
+        margin-bottom: 12px;
+    }
+
+    .form-row {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+</style> *@
+
+<script>
+    // Input focus effects
+    document.querySelectorAll('.form-input, .form-textarea').forEach(input => {
+        input.addEventListener('focus', function() {
+            this.parentElement.classList.add('focused');
+        });
+
+        input.addEventListener('blur', function() {
+            this.parentElement.classList.remove('focused');
+        });
+    });
+
+    // Set default dates for date filters
+    document.addEventListener('DOMContentLoaded', function() {
+        const startDateInput = document.querySelector('.date-filter-controls input[type="date"]:first-child');
+        const endDateInput = document.querySelector('.date-filter-controls input[type="date"]:last-child');
+
+        // Set start date to 30 days ago
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        if (startDateInput) {
+            startDateInput.valueAsDate = thirtyDaysAgo;
+        }
+
+        // Set end date to today
+        if (endDateInput) {
+            endDateInput.valueAsDate = new Date();
+        }
+    });
+
+    // View button functionality
+    document.querySelector('.btn-view')?.addEventListener('click', function() {
+        const startDate = document.querySelector('.date-filter-controls input[type="date"]:first-child').value;
+        const endDate = document.querySelector('.date-filter-controls input[type="date"]:last-child').value;
+
+        console.log('Filtering OPD History from:', startDate, 'to:', endDate);
+        // Add your filter logic here
+    });
+</script>
 
 <script>
     // Input focus effects

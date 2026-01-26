@@ -9,6 +9,7 @@ namespace CompileCares.Application.Features.Patients.DTOs
         public Gender Gender { get; set; }
         public int? Age { get; set; }
         public string Mobile { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
         public DateTime? DateOfBirth { get; set; }
     }
 }

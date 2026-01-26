@@ -368,22 +368,6 @@ namespace CompileCares.API.Controllers
                     statusCode: StatusCodes.Status500InternalServerError);
             }
         }
-
-        #region DTOs for Additional Operations
-
-        public class SetAvailabilityRequest
-        {
-            public bool IsAvailable { get; set; }
-        }
-
-        public class UpdateSignatureRequest
-        {
-            public string SignaturePath { get; set; } = string.Empty;
-            public string? DigitalSignature { get; set; }
-        }
-
-        #endregion
-
         private Guid GetCurrentUserId()
         {
             // Implementation depends on your authentication setup
